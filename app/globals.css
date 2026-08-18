@@ -1,0 +1,353 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  ─────────────────────────────────────────────────────────────────────────
+  Дизайн-система «Труд крут» / РСО
+  Скин: официальный брендбук РСО (палитра, лого, паттерн, шрифты).
+  Дисциплина: один акцент (синий), плоскость без теней, острые углы (radius 0),
+  пилюли только на кнопках, HUD-лейблы, компактный ритм — анти-слоп.
+
+  Архитектура: семантические токены (--background, --primary, …) заданы «сырыми»
+  значениями в :root и мапятся в Tailwind через @theme inline (как у shadcn),
+  чтобы компоненты shadcn/ui работали. Бренд-специфика (rso-*, статусы, шрифты,
+  типо-шкала) — в обычном @theme.
+  ─────────────────────────────────────────────────────────────────────────
+*/
+
+@theme {
+  /* ── Палитра РСО (основная, из брендбука) ───────────────────────────── */
+  --color-rso-blue: #0804ff;
+  --color-rso-white: #ffffff;
+  --color-rso-gray: #eeeeee;
+  --color-rso-black: #000000;
+
+  /* ── Палитры направлений РСО (диджитал, из брендбука; 3 оттенка) ────── */
+  --color-dir-orange-light: #ffdebf;
+  --color-dir-orange: #fe9633;
+  --color-dir-orange-dark: #fb7a00;
+  --color-dir-sky-light: #d4ecff;
+  --color-dir-sky: #4cacf7;
+  --color-dir-sky-dark: #008fff;
+  --color-dir-coral-light: #ffdfd4;
+  --color-dir-coral: #ff794c;
+  --color-dir-coral-dark: #ff4c0f;
+  --color-dir-blue-light: #e1e0ff;
+  --color-dir-blue: #0453ff;
+  --color-dir-blue-dark: #0040cb;
+  --color-dir-green-light: #dcffe6;
+  --color-dir-green: #6dc185;
+  --color-dir-green-dark: #469e5f;
+  --color-dir-cyan-light: #d9fcff;
+  --color-dir-cyan: #00dff2;
+  --color-dir-cyan-dark: #00c5d6;
+  --color-dir-purple-light: #e8ddff;
+  --color-dir-purple: #8043f9;
+  --color-dir-purple-dark: #6601e9;
+  --color-dir-red-light: #ffe5e3;
+  --color-dir-red: #fe4734;
+  --color-dir-red-dark: #e61f25;
+
+  /* ── Статусы заявок (AppStatus) — из палитр направлений ─────────────── */
+  --color-status-new: #0453ff;
+  --color-status-review: #fe9633;
+  --color-status-finalist: #4cacf7;
+  --color-status-winner: #0804ff;
+  --color-status-rejected: #e61f25;
+
+  /* ── Типографика (связка с next/font из app/fonts.ts) ───────────────── */
+  --font-display: var(--font-actay), "Arial Black", system-ui, sans-serif;
+  --font-heading: var(--font-stolzl), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+
+  /* ── Типо-шкала: компактно в HUD, читаемо в прозе ───────────────────── */
+  --text-label: 0.75rem;
+  --text-label--line-height: 1.2;
+  --text-label--letter-spacing: 0.02em;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  --text-heading: 1.875rem;
+  --text-heading--line-height: 1.15;
+  --text-display: 5rem;
+  --text-display--line-height: 0.92;
+  --text-display--letter-spacing: -0.01em;
+
+  /* ── Ритм ───────────────────────────────────────────────────────────── */
+  --spacing-section: 4rem; /* 64px между блоками */
+}
+
+/* Маппинг семантических токенов shadcn → «сырые» переменные :root */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+}
+
+/*
+  Значения токенов = палитра РСО. Светлая тема — единственная.
+  Острые углы: --radius: 0. Пилюли делаются точечно (кнопки, овал-лого).
+*/
+:root {
+  --radius: 0rem;
+
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+
+  --primary: #0804ff; /* фирменный синий — CTA */
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeee; /* серый — вторичные поверхности */
+  --secondary-foreground: #000000;
+  --muted: #eeeeee;
+  --muted-foreground: #4a4a4a;
+  --accent: #eeeeee; /* hover-фон (не синий, чтобы не перегружать) */
+  --accent-foreground: #000000;
+  --destructive: #e61f25;
+  --destructive-foreground: #ffffff;
+
+  --border: #000000; /* острые чёрные границы — фирменный «швейцарский» приём */
+  --input: #000000;
+  --ring: #0804ff; /* фокус-ринг — синий */
+
+  /* Графики дашборда → основные оттенки направлений */
+  --chart-1: #0804ff;
+  --chart-2: #4cacf7;
+  --chart-3: #6dc185;
+  --chart-4: #fe9633;
+  --chart-5: #8043f9;
+
+  /* Сайдбар админки */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #000000;
+  --sidebar-primary: #0804ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eeeeee;
+  --sidebar-accent-foreground: #000000;
+  --sidebar-border: #000000;
+  --sidebar-ring: #0804ff;
+}
+
+/*
+  ЛЕНДИНГ (публичная витрина) — ПЕРВЫЙ дизайн РСО (возврат по запросу):
+  белый холст, чёрный текст, синий #0804FF (единственный акцент), острые углы,
+  чёрные границы, HUD-лейблы, Actay/Stolzl/Onest, паттерн-квадраты.
+  Сохранены недавние улучшения: моушн (framer-motion), номинации кликом →
+  мини-панель, места под фото/видео. Скоуп .landing; админка/формы не тронуты.
+*/
+.landing {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --popover: #ffffff;
+  --popover-foreground: #000000;
+
+  --primary: #0804ff; /* фирменный синий — единственный акцент/CTA */
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeee; /* серый — вторичные поверхности */
+  --secondary-foreground: #000000;
+  --muted: #eeeeee;
+  --muted-foreground: #4a4a4a;
+  --accent: #eeeeee;
+  --accent-foreground: #000000;
+
+  --border: #000000; /* острые чёрные границы — фирменный приём */
+  --input: #000000;
+  --ring: #0804ff;
+
+  /* Шрифты РСО: Actay (дисплей) + Stolzl (заголовки/HUD) + Onest (проза) */
+  --font-display: var(--font-actay), "Arial Black", system-ui, sans-serif;
+  --font-heading: var(--font-stolzl), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-onest), ui-sans-serif, system-ui, sans-serif;
+
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-onest);
+}
+
+/* Синий халфтон (только синий, на-бренд) — текстура медиа-слотов */
+.landing .halftone {
+  background-image: radial-gradient(#0804ff 1.4px, transparent 1.5px);
+  background-size: 16px 16px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-size: var(--text-body);
+    line-height: 1.5;
+  }
+  html {
+    @apply font-sans antialiased;
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* ── Фирменные утилиты ──────────────────────────────────────────────── */
+
+/* Титулы — Actay Wide, «блочные» */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Цифры — Stolzl Light (правило брендбука) */
+.numeric {
+  font-family: var(--font-heading);
+  font-weight: 300;
+  font-variant-numeric: tabular-nums;
+}
+
+/* HUD-лейбл: техно-подпись над блоками */
+.hud-label {
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: var(--text-label);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* ─── Тема личного кабинета участника (тёмная по умолчанию, светлая по тумблеру) ─── */
+[data-cab-theme="dark"] {
+  --cab-bg: #08080a;
+  --cab-surface: #121216;
+  --cab-surface2: #15151a;
+  --cab-border: #2a2a32;
+  --cab-border-soft: #1e1e24;
+  --cab-text: #f2f0ec;
+  --cab-text2: #c8c8d0;
+  --cab-muted: #9a9aa4;
+  --cab-faint: #6a6a72;
+  --cab-inset: #0f0f14;
+  --cab-warn-bg: #1c0e00;
+  --cab-warn-bd: #4a2e0e;
+  --cab-warn-tx: #f0a35a;
+  --cab-rej-bg: #1a1113;
+  --cab-rej-bd: #4a2a2e;
+  --cab-rej-tx: #d98a8a;
+}
+[data-cab-theme="light"] {
+  --cab-bg: #f4f4f7;
+  --cab-surface: #ffffff;
+  --cab-surface2: #ececf2;
+  --cab-border: #e4e4ea;
+  --cab-border-soft: #ececf1;
+  --cab-text: #17171c;
+  --cab-text2: #3a3a44;
+  --cab-muted: #5c5c66;
+  --cab-faint: #8a8a94;
+  --cab-inset: #f2f2f7;
+  --cab-warn-bg: #fff4e6;
+  --cab-warn-bd: #f2c48a;
+  --cab-warn-tx: #b45309;
+  --cab-rej-bg: #fdecec;
+  --cab-rej-bd: #f2b0b0;
+  --cab-rej-tx: #b91c1c;
+}
+/* Переключение логотипа под тему */
+.cab-logo-light { display: none; }
+[data-cab-theme="light"] .cab-logo-dark { display: none; }
+[data-cab-theme="light"] .cab-logo-light { display: block; }
+
+/* ─── Производительность: зерно только на десктопе, уважать reduced-motion ─── */
+@media (max-width: 820px) {
+  .film-grain { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .film-grain { display: none; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ─── Мобилка: без горизонтального скролла (страховка на всех страницах) ─── */
+html, body { max-width: 100%; overflow-x: hidden; }
+
+/* ─── Мобилка: шапка формы заявки (не даём «На сайт» налезать на шаги) ─── */
+@media (max-width: 640px) {
+  .apply-topbar { padding-left: 14px !important; padding-right: 14px !important; }
+  .apply-back-text { display: none; }
+  .apply-step-label { display: none; }
+  .apply-spacer { width: 20px !important; }
+}
+
+/* ─── Скелетоны загрузки ─── */
+@keyframes cab-skel {
+  0% { opacity: 0.5; }
+  50% { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+.skel {
+  background: #16161c;
+  border-radius: 10px;
+  animation: cab-skel 1.3s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skel { animation: none; }
+}
+
+/* ─── Подсветка незаполненных обязательных полей формы заявки ─── */
+/* Контур обёртки работает для любого типа поля (input, select, чекбокс, фото). */
+.field-invalid {
+  scroll-margin-top: 96px;
+  outline: 1.5px solid #ff6b6b;
+  outline-offset: 8px;
+  border-radius: 10px;
+}
+.field-invalid label { color: #ff6b6b !important; }
+.field-invalid input,
+.field-invalid textarea,
+.field-invalid select {
+  border-color: #ff6b6b !important;
+}

@@ -1,0 +1,10 @@
+node_modules
+.next
+out
+build
+lib/generated
+public/brand
+_fonts_src
+app/fonts
+package-lock.json
+*.min.css

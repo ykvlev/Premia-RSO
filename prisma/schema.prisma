@@ -1,0 +1,164 @@
+// Схема данных Национальной премии «Труд крут» (SPEC §4).
+// Ключевой принцип: номинации и их поля — декларативно (criteria/formSchema Json),
+// форма рендерится из схемы; смена номинаций от сезона к сезону — без правок кода.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  participant
+  jury
+  admin
+  superadmin
+}
+
+enum AppStatus {
+  new // Отправлена
+  queued // Ожидает рассмотрения
+  review // На рассмотрении
+  revision // Требует доработки
+  scoring // На оценке жюри
+  finalist // Финалист
+  winner // Победитель
+  rejected // Отклонена
+}
+
+model User {
+  id           String           @id @default(cuid())
+  fio          String
+  email        String           @unique
+  passwordHash String
+  role         Role             @default(participant)
+  permissions  Json? // права жюри: {score, comment, changeStatus, viewContacts}
+  evaluations  Evaluation[]
+  assignments  JuryAssignment[]
+  createdAt    DateTime         @default(now())
+}
+
+model Season {
+  id            String       @id @default(cuid())
+  year          Int
+  startAt       DateTime
+  endAt         DateTime
+  isActive      Boolean      @default(false)
+  scoringConfig Json // веса критериев, формула агрегации
+  nominations   Nomination[]
+}
+
+model Nomination {
+  id              String           @id @default(cuid())
+  seasonId        String
+  season          Season           @relation(fields: [seasonId], references: [id])
+  title           String
+  description     String
+  criteria        Json // [{key, label, maxScore, weight}]
+  participantType String // работодатель / вуз / отделение / орган власти / СМИ / ...
+  formSchema      Json // поля формы: [{name, label, type, required, options}]
+  applications    Application[]
+  assignments     JuryAssignment[]
+}
+
+model Application {
+  id              String       @id @default(cuid())
+  nominationId    String
+  nomination      Nomination   @relation(fields: [nominationId], references: [id])
+  participantType String
+  orgName         String
+  inn             String
+  ogrn            String?
+  region          String
+  activityField   String?
+  contactFio      String
+  position        String?
+  phone           String
+  email           String
+  links           String?
+  payload         Json // спец-поля номинации по formSchema
+  status          AppStatus    @default(new)
+  expertComment   String? // комментарий эксперта из админки (шлётся заявителю)
+  internalNote    String? // внутренняя заметка оргкомитета (заявителю НЕ видна)
+  attachments     Attachment[]
+  evaluations     Evaluation[]
+  events          ApplicationEvent[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @default(now()) @updatedAt
+}
+
+// Самоотвод жюри по заявке (конфликт интересов) — заявку не оценивает.
+model JuryRecusal {
+  id            String   @id @default(cuid())
+  juryUserId    String
+  applicationId String
+  createdAt     DateTime @default(now())
+
+  @@unique([juryUserId, applicationId])
+  @@index([applicationId])
+}
+
+// История действий по заявке (кто, что, когда) — для аудита в админке.
+model ApplicationEvent {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actor         String // email того, кто выполнил действие
+  action        String // человекочитаемое описание действия
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
+}
+
+// Журнал попыток входа (безопасность): кто, откуда, успех/провал.
+model LoginEvent {
+  id        String   @id @default(cuid())
+  email     String
+  userId    String?
+  role      String?
+  success   Boolean
+  reason    String? // почему отказано: no_user / bad_password / bad_input
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+}
+
+model Attachment {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  filename      String
+  url           String
+  size          Int
+  mime          String
+}
+
+model Evaluation {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  juryUserId    String
+  jury          User        @relation(fields: [juryUserId], references: [id])
+  scores        Json // {criteriaKey: score}
+  comment       String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+
+  @@unique([applicationId, juryUserId])
+}
+
+model JuryAssignment {
+  id           String     @id @default(cuid())
+  juryUserId   String
+  jury         User       @relation(fields: [juryUserId], references: [id])
+  nominationId String
+  nomination   Nomination @relation(fields: [nominationId], references: [id])
+
+  @@unique([juryUserId, nominationId])
+}
