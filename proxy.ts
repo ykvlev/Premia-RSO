@@ -1,14 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { recordRequest } from "@/lib/observability";
+import { isMaintenanceActive } from "@/lib/maintenance";
 
 /**
- * Proxy (Next 16, Node-рантайм по умолчанию) — лёгкий журнал входящих запросов
- * для панели супер-админа. Пишет в общий in-process буфер observability.
- * Никогда не бросает и ничего не блокирует.
+ * Proxy (Next 16, Node-рантайм по умолчанию) — журнал запросов + maintenance mode.
+ * При включённом maintenance mode все запросы (кроме /api, /admin, статики) перенаправляются на /maintenance.
  */
 export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // ── Maintenance mode: блокируем всё кроме API, админки, статики ──────────
   try {
-    // Пропускаем RSC-префетчи/рефреши, чтобы журнал отражал реальные обращения.
+    if (
+      isMaintenanceActive() &&
+      !pathname.startsWith("/api") &&
+      !pathname.startsWith("/admin") &&
+      !pathname.startsWith("/_next") &&
+      !pathname.startsWith("/brand") &&
+      !pathname.includes(".")
+    ) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/maintenance";
+      return NextResponse.rewrite(url);
+    }
+  } catch {
+    /* fallback: если файл не читается — пропускаем */
+  }
+
+  // ── Request logging ──────────────────────────────────────────────────────
+  try {
     const isRsc =
       request.headers.get("rsc") === "1" ||
       request.headers.get("next-router-prefetch") === "1";
@@ -33,6 +53,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Всё, кроме статики Next, картинок-оптимизаций, фавикона и служебных файлов.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|svg|webp|ico|css|js|woff2?)$).*)"],
 };
