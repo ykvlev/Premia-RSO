@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import { clearErrors, recordError } from "@/lib/observability";
+import {
+  activateMaintenance,
+  deactivateMaintenance,
+  getMaintenanceInfo,
+} from "@/lib/maintenance";
 
 /** Очистить буфер ошибок наблюдаемости. Только супер-админ. */
 export async function clearErrorBuffer(): Promise<{ ok: boolean; cleared: number }> {
@@ -11,6 +16,33 @@ export async function clearErrorBuffer(): Promise<{ ok: boolean; cleared: number
   const cleared = clearErrors();
   revalidatePath("/admin/super");
   return { ok: true, cleared };
+}
+
+/** Получить статус maintenance mode */
+export async function getMaintenanceStatus() {
+  await requireRole("superadmin");
+  return getMaintenanceInfo();
+}
+
+/** Включить / выключить режим обслуживания (DDoS kill switch) */
+export async function toggleMaintenance(
+  enable: boolean,
+  reason?: string,
+): Promise<{ ok: boolean; error?: string; active: boolean }> {
+  await requireRole("superadmin");
+  try {
+    if (enable) {
+      activateMaintenance("superadmin", reason);
+    } else {
+      deactivateMaintenance();
+    }
+    revalidatePath("/admin/super");
+    revalidatePath("/maintenance");
+    return { ok: true, active: enable };
+  } catch (e) {
+    recordError(e, "toggleMaintenance");
+    return { ok: false, error: "Не удалось переключить режим обслуживания", active: false };
+  }
 }
 
 type FieldInput = {

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus } from "@/app/admin/super/actions";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -96,6 +96,9 @@ export type SuperData = {
   };
   seasons: { id: string; year: number; isActive: boolean }[];
   tables: { name: string; count: number }[];
+  disk: { totalGB: number; usedGB: number; freeGB: number; pct: number };
+  git: { branch: string; commit: string; message: string; author: string; date: string };
+  maintenance: { active: boolean; activatedAt: string | null; activatedBy: string | null; reason: string | null };
 };
 
 // ─── Токены темы ────────────────────────────────────────────────────────────
@@ -423,6 +426,8 @@ export function SuperDashboard({ data }: { data: SuperData }) {
   const [isPending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [showEnvKeys, setShowEnvKeys] = useState(false);
+  const [maintenanceActive, setMaintenanceActive] = useState(data.maintenance.active);
+  const [maintPending, setMaintPending] = useState(false);
 
   function flash(text: string) {
     setMsg(text);
@@ -441,6 +446,17 @@ export function SuperDashboard({ data }: { data: SuperData }) {
       flash(r.ok ? (next ? "Сезон активирован" : "Сезон выключен") : r.error ?? "Ошибка");
       router.refresh();
     });
+  }
+  async function doToggleMaintenance(enable: boolean) {
+    setMaintPending(true);
+    const r = await toggleMaintenance(enable, enable ? "DDoS protection" : undefined);
+    if (r.ok) {
+      setMaintenanceActive(r.active);
+      flash(r.active ? "🔒 Сайт заблокирован" : "🔓 Сайт разблокирован");
+    } else {
+      flash(r.error ?? "Ошибка");
+    }
+    setMaintPending(false);
   }
   function exportJson() {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -616,6 +632,101 @@ export function SuperDashboard({ data }: { data: SuperData }) {
             sub={`${s.cpus} ядер · ${s.loadavg.map((x) => x.toFixed(1)).join(" / ")}`}
           />
           <Stat label="Платформа" value={s.node} sub={s.platform} />
+        </div>
+
+        {/* Доп. системные метрики: диск, git, maintenance */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          <Stat
+            label="Диск"
+            value={`${data.disk.pct}%`}
+            color={data.disk.pct > 90 ? C.red : data.disk.pct > 75 ? C.amber : C.green}
+            sub={`${data.disk.usedGB}/${data.disk.totalGB} GB`}
+          />
+          {data.git.branch && (
+            <Stat
+              label="Git"
+              value={data.git.commit || "—"}
+              sub={`${data.git.branch} · ${data.git.message.slice(0, 30)}`}
+            />
+          )}
+          {data.git.author && (
+            <Stat label="Автор коммита" value={data.git.author} sub={data.git.date.slice(0, 19)} />
+          )}
+        </div>
+
+        {/* DDoS Kill Switch */}
+        <div
+          style={{
+            background: maintenanceActive ? "rgba(255,68,68,0.08)" : C.card,
+            border: `2px solid ${maintenanceActive ? "#ff4444" : C.border}`,
+            borderRadius: 14,
+            padding: "18px 22px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 12,
+              background: maintenanceActive ? "rgba(255,68,68,0.15)" : "rgba(47,191,107,0.1)",
+              border: `2px solid ${maintenanceActive ? "#ff4444" : "#2fbf6b"}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 22,
+              flexShrink: 0,
+            }}
+          >
+            {maintenanceActive ? "🔒" : "🔓"}
+          </div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <p style={{ color: C.text, fontSize: 16, fontFamily: F, fontWeight: 700, margin: "0 0 4px" }}>
+              Режим обслуживания (DDoS)
+            </p>
+            <p style={{ color: maintenanceActive ? "#ff6b6b" : C.muted, fontSize: 13, fontFamily: F, margin: 0 }}>
+              {maintenanceActive
+                ? `Сайт заблокирован · ${data.maintenance.activatedAt?.slice(0, 19) || ""}`
+                : "Сайт доступен для всех пользователей"}
+            </p>
+          </div>
+          <button
+            onClick={() => doToggleMaintenance(!maintenanceActive)}
+            disabled={maintPending}
+            style={{
+              background: maintenanceActive ? "#2fbf6b" : "#ff4444",
+              color: "#fff",
+              border: "none",
+              borderRadius: 999,
+              padding: "12px 24px",
+              fontSize: 14,
+              fontFamily: F,
+              fontWeight: 700,
+              cursor: maintPending ? "default" : "pointer",
+              opacity: maintPending ? 0.6 : 1,
+              letterSpacing: "0.3px",
+              transition: "transform 0.15s",
+            }}
+            onMouseEnter={(e) => { if (!maintPending) e.currentTarget.style.transform = "scale(1.03)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            {maintPending
+              ? "Обработка…"
+              : maintenanceActive
+                ? "Разблокировать сайт"
+                : "Заблокировать сайт"}
+          </button>
         </div>
 
         {/* KPI */}

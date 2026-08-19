@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import os from "node:os";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import {
@@ -11,6 +12,7 @@ import {
   getRecentRequests,
   getRequestStats,
 } from "@/lib/observability";
+import { getMaintenanceInfo } from "@/lib/maintenance";
 import { SuperDashboard } from "@/components/admin/super-dashboard";
 
 export const metadata: Metadata = { title: "Супер-админ · Панель системы" };
@@ -347,6 +349,36 @@ export default async function SuperPage() {
         { name: "LoginEvent", count: leCount },
       ],
     };
+
+    // ── Disk, Git, Maintenance ───────────────────────────────────────────────
+    let disk = { totalGB: 0, usedGB: 0, freeGB: 0, pct: 0 };
+    try {
+      const df = execSync("df -BG / | tail -1", { encoding: "utf8", timeout: 3000 });
+      const parts = df.trim().split(/\s+/);
+      if (parts.length >= 4) {
+        disk = {
+          totalGB: parseInt(parts[1]) || 0,
+          usedGB: parseInt(parts[2]) || 0,
+          freeGB: parseInt(parts[3]) || 0,
+          pct: parseInt(parts[4]) || 0,
+        };
+      }
+    } catch {}
+
+    let git = { branch: "", commit: "", message: "", author: "", date: "" };
+    try {
+      git.branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8", timeout: 3000 }).trim();
+      git.commit = execSync("git rev-parse --short HEAD", { encoding: "utf8", timeout: 3000 }).trim();
+      git.message = execSync("git log -1 --pretty=%s", { encoding: "utf8", timeout: 3000 }).trim();
+      git.author = execSync("git log -1 --pretty=%an", { encoding: "utf8", timeout: 3000 }).trim();
+      git.date = execSync("git log -1 --pretty=%ci", { encoding: "utf8", timeout: 3000 }).trim();
+    } catch {}
+
+    const maintenance = getMaintenanceInfo();
+
+    data.disk = disk;
+    data.git = git;
+    data.maintenance = maintenance;
   } catch {
     // БД недоступна — пустой дашборд
     const perf = getPerfStats(30);
@@ -390,6 +422,9 @@ export default async function SuperPage() {
       activeSeason: null, perf, errors, users: [], failedByIp: [], requests: [], reqStats,
       env: { critical: CRITICAL_ENV.map((e) => ({ key: e.key, set: false, secret: e.secret, preview: "—" })), allKeys: Object.keys(process.env).sort(), deps },
       seasons: [], tables: [],
+      disk: { totalGB: 0, usedGB: 0, freeGB: 0, pct: 0 },
+      git: { branch: "", commit: "", message: "", author: "", date: "" },
+      maintenance: getMaintenanceInfo(),
     };
   }
 
