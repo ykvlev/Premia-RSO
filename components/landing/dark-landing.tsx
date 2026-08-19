@@ -547,18 +547,18 @@ function Header({
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <button
-            onClick={() => router.push("/vhod")}
+            onClick={() => router.push("/login")}
             className="hdr-login cursor-pointer rounded-full border border-[#2a2a32] bg-transparent px-5 py-3 text-[15px] font-medium text-[#f2f0ec] transition-all duration-200 hover:border-[#4a4a56]"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
             Войти
           </button>
           <button
-            onClick={() => router.push("/apply")}
+            onClick={() => router.push("/register")}
             className="cursor-pointer rounded-full border-0 bg-[#0804ff] px-6 py-3 text-[15px] font-medium text-white transition-all duration-200 hover:scale-105 hover:bg-[#0a06ff] active:scale-95"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
-            Подать заявку
+            Регистрация
           </button>
         </div>
       </div>
@@ -750,7 +750,7 @@ function Hero({
             style={{ display: "flex", gap: 12, marginTop: 36 }}
           >
             <button
-              onClick={() => router.push("/apply")}
+              onClick={() => router.push("/register")}
               style={{
                 background: "#0804ff",
                 color: "white",
@@ -766,7 +766,7 @@ function Hero({
               onMouseEnter={(e) => (e.currentTarget.style.background = "#0603cc")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#0804ff")}
             >
-              Подать заявку
+              Регистрация
             </button>
             <button
               onClick={() =>
@@ -1963,7 +1963,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Нужно ли регистрироваться, чтобы подать заявку?",
-    a: "Нет. Заявка подаётся без входа — на странице «Подать заявку». После первой заявки мы автоматически создадим для вас личный кабинет и пришлём логин и пароль на указанную почту.",
+    a: "Да. Для подачи заявки необходимо зарегистрироваться и заполнить профиль. Это занимает всего пару минут — подтвердите почту и укажите ФИО.",
   },
   {
     q: "До какого числа идёт приём заявок?",
