@@ -10,6 +10,7 @@ import {
   getMaintenanceInfo,
 } from "@/lib/maintenance";
 import { banIp, unbanIp, getBans } from "@/lib/ip-ban";
+import { blockSession, unblockSession, getBlockedSessions } from "@/lib/session-blocklist";
 
 /** Очистить буфер ошибок наблюдаемости. Только супер-админ. */
 export async function clearErrorBuffer(): Promise<{ ok: boolean; cleared: number }> {
@@ -283,4 +284,80 @@ export async function sendMassEmail(
     recordError(e, "sendMassEmail");
     return { ok: false, sent: 0, error: "Ошибка массовой рассылки" };
   }
+}
+
+// ── Session Registry ────────────────────────────────────────────────────────
+
+export async function getActiveSessions() {
+  await requireRole("superadmin");
+
+  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+  const logins = await db.loginEvent.findMany({
+    where: { success: true, createdAt: { gte: twoHoursAgo } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      email: true,
+      userId: true,
+      role: true,
+      ip: true,
+      userAgent: true,
+      createdAt: true,
+    },
+  });
+
+  const blocked = getBlockedSessions().map((b) => b.userId);
+
+  // Группируем по userId — берём последний вход
+  const byUser = new Map<string, typeof logins[0]>();
+  for (const l of logins) {
+    const key = l.userId ?? l.email;
+    if (!byUser.has(key)) byUser.set(key, l);
+  }
+
+  return [...byUser.values()].map((l) => ({
+    id: l.id,
+    email: l.email,
+    userId: l.userId,
+    role: l.role,
+    ip: l.ip,
+    userAgent: l.userAgent,
+    loginAt: l.createdAt.toISOString(),
+    blocked: l.userId ? blocked.includes(l.userId) : false,
+  }));
+}
+
+export async function forceLogout(
+  userId: string,
+  reason?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    blockSession(userId, user.email, "superadmin", reason || "Force logout by admin");
+    revalidatePath("/admin/super");
+    return { ok: true };
+  } catch (e) {
+    recordError(e, "forceLogout");
+    return { ok: false, error: "Ошибка" };
+  }
+}
+
+export async function unblockUserSession(
+  userId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  const removed = unblockSession(userId);
+  revalidatePath("/admin/super");
+  return removed ? { ok: true } : { ok: false, error: "Сессия не найдена в блоклисте" };
+}
+
+export async function getBlockedSessionList() {
+  await requireRole("superadmin");
+  return getBlockedSessions();
 }

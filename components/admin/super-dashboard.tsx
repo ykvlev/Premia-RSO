@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession } from "@/app/admin/super/actions";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -100,6 +100,7 @@ export type SuperData = {
   git: { branch: string; commit: string; message: string; author: string; date: string };
   maintenance: { active: boolean; activatedAt: string | null; activatedBy: string | null; reason: string | null };
   bans: { ip: string; reason: string; bannedBy: string; bannedAt: string }[];
+  sessions: { id: string; email: string; userId: string | null; role: string | null; ip: string | null; userAgent: string | null; loginAt: string; blocked: boolean }[];
 };
 
 // ─── Токены темы ────────────────────────────────────────────────────────────
@@ -687,6 +688,181 @@ function ImpersonationCard({ users }: { users: { id: string; fio: string; email:
         </button>
       </div>
       {error && <p style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{error}</p>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Sessions Card — активные сессии + force-logout
+// ═══════════════════════════════════════════════════════════════════════════
+function SessionsCard({ sessions }: { sessions: { id: string; email: string; userId: string | null; role: string | null; ip: string | null; userAgent: string | null; loginAt: string; blocked: boolean }[] }) {
+  const [list, setList] = useState(sessions);
+  const [busy, setBusy] = useState(false);
+
+  const doForceLogout = async (userId: string) => {
+    if (!userId || busy) return;
+    setBusy(true);
+    const { forceLogout } = await import("@/app/admin/super/actions");
+    const res = await forceLogout(userId, "Force logout");
+    setBusy(false);
+    if (res.ok) {
+      setList(list.map((s) => s.userId === userId ? { ...s, blocked: true } : s));
+    }
+  };
+
+  const doUnblock = async (userId: string) => {
+    if (!userId || busy) return;
+    setBusy(true);
+    const { unblockUserSession } = await import("@/app/admin/super/actions");
+    await unblockUserSession(userId);
+    setBusy(false);
+    setList(list.map((s) => s.userId === userId ? { ...s, blocked: false } : s));
+  };
+
+  const parseUA = (ua: string | null) => {
+    if (!ua) return "—";
+    if (ua.includes("Chrome")) return "Chrome";
+    if (ua.includes("Firefox")) return "Firefox";
+    if (ua.includes("Safari")) return "Safari";
+    if (ua.includes("Edge")) return "Edge";
+    return ua.slice(0, 30);
+  };
+
+  return (
+    <div>
+      {list.length === 0 ? (
+        <p style={{ color: C.muted, fontSize: 12.5, fontStyle: "italic" }}>Нет активных сессий (за 2ч)</p>
+      ) : (
+        <Scroll max={280}>
+          {list.map((s) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.blocked ? "#ff3b30" : C.green, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: F, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {s.email}
+                  <span style={{ color: C.dim, fontSize: 11, fontWeight: 400, marginLeft: 6 }}>{s.role}</span>
+                </div>
+                <div style={{ fontSize: 11, color: C.dim, fontFamily: MONO, display: "flex", gap: 12 }}>
+                  <span>{s.ip ?? "—"}</span>
+                  <span>{parseUA(s.userAgent)}</span>
+                  <span>{new Date(s.loginAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
+                </div>
+              </div>
+              {s.userId && (
+                s.blocked ? (
+                  <button
+                    onClick={() => doUnblock(s.userId!)}
+                    disabled={busy}
+                    style={{ background: "none", color: C.green, border: `1px solid ${C.green}44`, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Разблок.
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => doForceLogout(s.userId!)}
+                    disabled={busy}
+                    style={{ background: "none", color: "#ff3b30", border: `1px solid #ff3b3044`, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Kick
+                  </button>
+                )
+              )}
+            </div>
+          ))}
+        </Scroll>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Live Logs Card — SSE-стрим логов в реальном времени
+// ═══════════════════════════════════════════════════════════════════════════
+function LiveLogsCard() {
+  const [entries, setEntries] = useState<{ type: string; method?: string; path?: string; ip?: string; message?: string; context?: string; at: number }[]>([]);
+  const [connected, setConnected] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRef = useRef(true);
+
+  useEffect(() => {
+    const es = new EventSource("/api/admin/super/logs");
+
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
+
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (data.type === "init") {
+          setEntries(data.entries);
+        } else if (data.type === "update") {
+          setEntries((prev) => {
+            const merged = [...data.entries, ...prev];
+            // deduplicate by at+type+path
+            const seen = new Set<string>();
+            return merged.filter((e: any) => {
+              const k = `${e.at}-${e.type}-${e.path ?? e.message}`;
+              if (seen.has(k)) return false;
+              seen.add(k);
+              return true;
+            }).slice(0, 80);
+          });
+        }
+      } catch { /* skip */ }
+    };
+
+    return () => es.close();
+  }, []);
+
+  useEffect(() => {
+    if (autoScrollRef.current && scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [entries]);
+
+  const timeStr = (at: number) => new Date(at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: connected ? C.green : "#ff3b30",
+          boxShadow: connected ? `0 0 6px ${C.green}88` : "none",
+        }} />
+        <span style={{ fontSize: 11, color: C.dim, fontFamily: F }}>
+          {connected ? "Live" : "Disconnected"}
+        </span>
+        <span style={{ fontSize: 11, color: C.dim, fontFamily: MONO, marginLeft: "auto" }}>{entries.length} entries</span>
+      </div>
+      <div ref={scrollRef} style={{ maxHeight: 260, overflow: "auto", fontFamily: MONO, fontSize: 11 }}>
+        {entries.length === 0 ? (
+          <p style={{ color: C.muted, fontStyle: "italic", fontFamily: F }}>Ожидание событий...</p>
+        ) : (
+          entries.map((e, i) => (
+            <div key={`${e.at}-${i}`} style={{
+              display: "flex", gap: 8, padding: "3px 0",
+              borderBottom: `1px solid ${C.border}`,
+              color: e.type === "error" ? C.red : C.text,
+            }}>
+              <span style={{ color: C.dim, flexShrink: 0 }}>{timeStr(e.at)}</span>
+              {e.type === "request" ? (
+                <>
+                  <span style={{ color: e.method === "GET" ? C.green : e.method === "POST" ? "#ff9500" : C.accent, fontWeight: 600, flexShrink: 0, width: 36 }}>{e.method}</span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.path}</span>
+                  <span style={{ color: C.dim, flexShrink: 0 }}>{e.ip}</span>
+                </>
+              ) : (
+                <>
+                  <span style={{ color: C.red, fontWeight: 600, flexShrink: 0 }}>ERR</span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message}</span>
+                  {e.context && <span style={{ color: C.dim, flexShrink: 0 }}>[{e.context}]</span>}
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -1712,6 +1888,16 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* ── Вход от лица ────────────────────────────────────────────────── */}
           <Card title="Вход от лица">
             <ImpersonationCard users={data.users} />
+          </Card>
+
+          {/* ── Активные сессии ─────────────────────────────────────────────── */}
+          <Card title="Сессии">
+            <SessionsCard sessions={data.sessions} />
+          </Card>
+
+          {/* ── Live Logs ───────────────────────────────────────────────────── */}
+          <Card title="Логи">
+            <LiveLogsCard />
           </Card>
         </div>
       </div>

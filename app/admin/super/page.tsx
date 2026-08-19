@@ -379,10 +379,15 @@ export default async function SuperPage() {
     const { getBans } = await import("@/lib/ip-ban");
     const bans = getBans();
 
+    // Активные сессии
+    const { getActiveSessions } = await import("@/app/admin/super/actions");
+    const sessions = await getActiveSessions();
+
     data.disk = disk;
     data.git = git;
     data.maintenance = maintenance;
     data.bans = bans;
+    data.sessions = sessions;
   } catch {
     // БД недоступна — пустой дашборд
     const perf = getPerfStats(30);
@@ -430,6 +435,7 @@ export default async function SuperPage() {
       git: { branch: "", commit: "", message: "", author: "", date: "" },
       maintenance: getMaintenanceInfo(),
       bans: [],
+      sessions: [],
     };
   }
 

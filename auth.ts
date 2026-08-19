@@ -223,6 +223,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "vkid" && user) {
         token.role = user.role ?? "participant";
       }
+      // Force-logout: проверяем блоклист сессий
+      if (token?.id && typeof token.id === "string") {
+        try {
+          const { isSessionBlocked } = require("@/lib/session-blocklist");
+          if (isSessionBlocked(token.id)) {
+            return {} as any; // пустой токен → сессия сброшена
+          }
+        } catch { /* блоклист недоступен — пропускаем */ }
+      }
       return token;
     },
     session({ session, token }) {
