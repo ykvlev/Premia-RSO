@@ -213,12 +213,18 @@ export async function impersonateUser(
 ): Promise<{ ok: boolean; error?: string; token?: string }> {
   await requireRole("superadmin");
   try {
-    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
     if (!user) return { ok: false, error: "Пользователь не найдён" };
 
     const { SignJWT } = await import("jose");
     const secret = new TextEncoder().encode(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "");
-    const token = await new SignJWT({ sub: user.id, email: user.email, impersonated: true })
+    // JWT должен содержать id и role — точно так же, как NextAuth jwt callback
+    const token = await new SignJWT({
+      id: user.id,
+      role: user.role,
+      email: user.email,
+      impersonated: true,
+    })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("1h")

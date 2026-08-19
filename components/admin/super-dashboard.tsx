@@ -541,23 +541,53 @@ function IntegrationTestCard() {
 // Mass Email Card
 // ═══════════════════════════════════════════════════════════════════════════
 function MassEmailCard() {
-  const [target, setTarget] = useState<"all" | "participants" | "jury" | "admins">("all");
+  const [target, setTarget] = useState<"all" | "participants" | "jury" | "admins" | "test">("test");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [testEmail, setTestEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
   const doSend = async () => {
     if (!subject.trim() || !body.trim()) return;
+    if (target === "test" && !testEmail.trim()) return;
     setBusy(true);
     setResult(null);
+
+    if (target === "test") {
+      // Тестовая отправка на один email
+      try {
+        const { sendMail } = await import("@/lib/mail");
+        await sendMail({
+          to: testEmail.trim(),
+          subject: subject.trim(),
+          text: body.trim(),
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <div style="border-bottom:3px solid #0804ff;padding-bottom:12px;margin-bottom:20px;">
+              <strong style="color:#0804ff;font-size:18px;">Труд Крут</strong>
+            </div>
+            <div style="line-height:1.6;color:#333;">${body.trim().replace(/\n/g, "<br/>")}</div>
+            <div style="margin-top:24px;padding-top:12px;border-top:1px solid #eee;color:#999;font-size:12px;">
+              Национальная премия «Труд крут» · Российские студенческие отряды
+            </div>
+          </div>`,
+        });
+        setResult(`Тестовое письмо отправлено на ${testEmail.trim()}`);
+      } catch (e: any) {
+        setResult(`Ошибка: ${e?.message || "Не удалось отправить"}`);
+      }
+      setBusy(false);
+      return;
+    }
+
     const { sendMassEmail } = await import("@/app/admin/super/actions");
-    const res = await sendMassEmail(subject.trim(), body.trim(), target);
+    const res = await sendMassEmail(subject.trim(), body.trim(), target as any);
     setBusy(false);
     setResult(res.ok ? `Отправлено ${res.sent} писем` : res.error || "Ошибка");
   };
 
   const targets = [
+    { v: "test", l: "Тест →" },
     { v: "all", l: "Все" },
     { v: "participants", l: "Участники" },
     { v: "jury", l: "Жюри" },
@@ -566,7 +596,7 @@ function MassEmailCard() {
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         {targets.map((t) => (
           <button
             key={t.v}
@@ -587,6 +617,14 @@ function MassEmailCard() {
           </button>
         ))}
       </div>
+      {target === "test" && (
+        <input
+          placeholder="Тестовый email (реальный!)"
+          value={testEmail}
+          onChange={(e) => setTestEmail(e.target.value)}
+          style={{ width: "100%", background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: MONO, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}
+        />
+      )}
       <input
         placeholder="Тема письма"
         value={subject}
@@ -602,15 +640,15 @@ function MassEmailCard() {
       />
       <button
         onClick={doSend}
-        disabled={busy || !subject.trim() || !body.trim()}
+        disabled={busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim())}
         style={{
           ...exportBtn,
-          background: busy || !subject.trim() || !body.trim() ? C.card2 : C.accent,
-          color: busy || !subject.trim() || !body.trim() ? C.dim : "#fff",
-          border: `1px solid ${busy || !subject.trim() || !body.trim() ? C.border : C.accent}`,
+          background: busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.card2 : C.accent,
+          color: busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.dim : "#fff",
+          border: `1px solid ${busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.border : C.accent}`,
         }}
       >
-        {busy ? "Отправляю..." : "Отправить"}
+        {busy ? "Отправляю..." : target === "test" ? "Тестовое письмо" : "Отправить всем"}
       </button>
       {result && (
         <p style={{ color: result.includes("Ошибка") ? C.red : C.green, fontSize: 12, marginTop: 8 }}>{result}</p>
@@ -635,8 +673,8 @@ function ImpersonationCard({ users }: { users: { id: string; fio: string; email:
     const res = await impersonateUser(selectedId);
     setBusy(false);
     if (res.ok && res.token) {
-      document.cookie = `authjs.session-token=${res.token}; path=/; max-age=3600`;
-      window.location.href = "/cabinet";
+      // Редиректим на серверный роут — он установит httpOnly cookie
+      window.location.href = `/admin/super/impersonate?token=${encodeURIComponent(res.token)}`;
     } else {
       setError(res.error || "Ошибка");
     }
