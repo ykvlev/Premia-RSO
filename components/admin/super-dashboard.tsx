@@ -621,7 +621,7 @@ function MassEmailCard() {
 // ═══════════════════════════════════════════════════════════════════════════
 // Impersonation Card
 // ═══════════════════════════════════════════════════════════════════════════
-function ImpersonationCard({ users }: { users: { id: string; name: string | null; email: string | null; role: string }[] }) {
+function ImpersonationCard({ users }: { users: { id: string; fio: string; email: string; role: string }[] }) {
   const [selectedId, setSelectedId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -664,7 +664,7 @@ function ImpersonationCard({ users }: { users: { id: string; name: string | null
           <option value="">— Выберите —</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
-              {u.name || u.email || u.id} ({u.role})
+              {u.fio || u.email || u.id} ({u.role})
             </option>
           ))}
         </select>
@@ -1714,6 +1714,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
             <ImpersonationCard users={data.users} />
           </Card>
         </div>
+      </div>
 
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
     </main>

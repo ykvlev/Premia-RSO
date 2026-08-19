@@ -244,7 +244,7 @@ export async function sendMassEmail(
   }
 
   try {
-    const roleFilter = target === "all" ? {} : { role: target };
+    const roleFilter = target === "all" ? {} : { role: (target === "participants" ? "participant" : target) as any };
     const users = await db.user.findMany({
       where: roleFilter,
       select: { email: true },
