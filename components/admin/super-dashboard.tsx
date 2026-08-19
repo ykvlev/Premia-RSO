@@ -556,7 +556,7 @@ function MassEmailCard() {
     setResult(null);
 
     if (mode === "profile") {
-      const { sendProfileNotifications } = await import("@/app/api/notifications/actions");
+      const { sendProfileNotifications } = await import("@/lib/notifications/actions");
       const res = await sendProfileNotifications(subject.trim(), body.trim(), target === "test" ? "all" : target as any);
       setBusy(false);
       setResult(res.ok ? `Уведомления доставлены ${res.sent} пользователям` : res.error || "Ошибка");

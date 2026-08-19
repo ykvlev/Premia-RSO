@@ -42,7 +42,7 @@ export function NotificationBell() {
     let alive = true;
     const poll = async () => {
       try {
-        const { getUnreadCount } = await import("@/app/api/notifications/actions");
+        const { getUnreadCount } = await import("@/lib/notifications/actions");
         const c = await getUnreadCount();
         if (alive) setCount(c);
       } catch { /* ignore */ }
@@ -68,7 +68,7 @@ export function NotificationBell() {
     if (next && items.length === 0) {
       setLoading(true);
       try {
-        const { getMyNotifications } = await import("@/app/api/notifications/actions");
+        const { getMyNotifications } = await import("@/lib/notifications/actions");
         const notifs = await getMyNotifications(20);
         setItems(notifs.map((n) => ({ ...n, createdAt: n.createdAt.toISOString() })));
       } catch { /* ignore */ }
@@ -78,7 +78,7 @@ export function NotificationBell() {
 
   const markRead = async (id: string) => {
     try {
-      const { markAsRead } = await import("@/app/api/notifications/actions");
+      const { markAsRead } = await import("@/lib/notifications/actions");
       await markAsRead(id);
       setItems(items.map((n) => n.id === id ? { ...n, read: true } : n));
       setCount((c) => Math.max(0, c - 1));
@@ -87,7 +87,7 @@ export function NotificationBell() {
 
   const markAllRead = async () => {
     try {
-      const { markAllAsRead } = await import("@/app/api/notifications/actions");
+      const { markAllAsRead } = await import("@/lib/notifications/actions");
       await markAllAsRead();
       setItems(items.map((n) => ({ ...n, read: true })));
       setCount(0);

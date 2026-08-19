@@ -6,8 +6,6 @@ import { revalidatePath } from "next/cache";
 
 export type NotificationType = "info" | "warning" | "success" | "system";
 
-// ── Получить уведомления текущего пользователя ──────────────────────────────
-
 export async function getMyNotifications(limit = 30) {
   const session = await requireRole();
   const userId = session.user.id;
@@ -37,8 +35,6 @@ export async function getUnreadCount(): Promise<number> {
   });
 }
 
-// ── Отметить как прочитанное ────────────────────────────────────────────────
-
 export async function markAsRead(notificationId: string): Promise<{ ok: boolean }> {
   const session = await requireRole();
   const userId = session.user.id;
@@ -63,8 +59,6 @@ export async function markAllAsRead(): Promise<{ ok: boolean; count: number }> {
   return { ok: true, count: result.count };
 }
 
-// ── Создать уведомление (только для суперадмина) ────────────────────────────
-
 export async function createNotification(
   userId: string,
   title: string,
@@ -83,8 +77,6 @@ export async function createNotification(
     return { ok: false, error: "Ошибка создания уведомления" };
   }
 }
-
-// ── Массовая рассылка уведомлений в профиль ────────────────────────────────
 
 export async function sendProfileNotifications(
   title: string,
@@ -119,8 +111,6 @@ export async function sendProfileNotifications(
     return { ok: false, sent: 0, error: "Ошибка массовой рассылки" };
   }
 }
-
-// ── Удалить уведомление ─────────────────────────────────────────────────────
 
 export async function deleteNotification(
   notificationId: string,
