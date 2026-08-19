@@ -143,7 +143,7 @@ export function ProfileForm({ user }: { user: User }) {
 
     setSuccess(true);
     setPending(false);
-    router.refresh();
+    setTimeout(() => router.push("/cabinet"), 1500);
   }
 
   return (
