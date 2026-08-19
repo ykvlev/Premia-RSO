@@ -542,6 +542,7 @@ function IntegrationTestCard() {
 // ═══════════════════════════════════════════════════════════════════════════
 function MassEmailCard() {
   const [target, setTarget] = useState<"all" | "participants" | "jury" | "admins" | "test">("test");
+  const [mode, setMode] = useState<"email" | "profile">("profile");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [testEmail, setTestEmail] = useState("");
@@ -550,12 +551,19 @@ function MassEmailCard() {
 
   const doSend = async () => {
     if (!subject.trim() || !body.trim()) return;
-    if (target === "test" && !testEmail.trim()) return;
+    if (target === "test" && mode === "email" && !testEmail.trim()) return;
     setBusy(true);
     setResult(null);
 
+    if (mode === "profile") {
+      const { sendProfileNotifications } = await import("@/app/api/notifications/actions");
+      const res = await sendProfileNotifications(subject.trim(), body.trim(), target === "test" ? "all" : target as any);
+      setBusy(false);
+      setResult(res.ok ? `Уведомления доставлены ${res.sent} пользователям` : res.error || "Ошибка");
+      return;
+    }
+
     if (target === "test") {
-      // Тестовая отправка через серверный action
       const { sendTestEmail } = await import("@/app/admin/super/actions");
       const res = await sendTestEmail(testEmail.trim(), subject.trim(), body.trim());
       setBusy(false);
@@ -570,7 +578,7 @@ function MassEmailCard() {
   };
 
   const targets = [
-    { v: "test", l: "Тест →" },
+    { v: "test", l: "Тест" },
     { v: "all", l: "Все" },
     { v: "participants", l: "Участники" },
     { v: "jury", l: "Жюри" },
@@ -579,6 +587,42 @@ function MassEmailCard() {
 
   return (
     <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        <button
+          onClick={() => setMode("profile")}
+          style={{
+            flex: 1,
+            background: mode === "profile" ? C.green : C.card2,
+            color: mode === "profile" ? "#fff" : C.muted,
+            border: `1px solid ${mode === "profile" ? C.green : C.border}`,
+            borderRadius: 6,
+            padding: "6px 10px",
+            fontSize: 12,
+            fontFamily: F,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          В профиль
+        </button>
+        <button
+          onClick={() => setMode("email")}
+          style={{
+            flex: 1,
+            background: mode === "email" ? C.accent : C.card2,
+            color: mode === "email" ? "#fff" : C.muted,
+            border: `1px solid ${mode === "email" ? C.accent : C.border}`,
+            borderRadius: 6,
+            padding: "6px 10px",
+            fontSize: 12,
+            fontFamily: F,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          На почту
+        </button>
+      </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         {targets.map((t) => (
           <button
@@ -600,7 +644,7 @@ function MassEmailCard() {
           </button>
         ))}
       </div>
-      {target === "test" && (
+      {target === "test" && mode === "email" && (
         <input
           placeholder="Тестовый email (реальный!)"
           value={testEmail}
@@ -609,13 +653,13 @@ function MassEmailCard() {
         />
       )}
       <input
-        placeholder="Тема письма"
+        placeholder="Заголовок"
         value={subject}
         onChange={(e) => setSubject(e.target.value)}
         style={{ width: "100%", background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}
       />
       <textarea
-        placeholder="Текст письма..."
+        placeholder="Текст уведомления..."
         value={body}
         onChange={(e) => setBody(e.target.value)}
         rows={4}
@@ -623,15 +667,15 @@ function MassEmailCard() {
       />
       <button
         onClick={doSend}
-        disabled={busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim())}
+        disabled={busy || !subject.trim() || !body.trim() || (target === "test" && mode === "email" && !testEmail.trim())}
         style={{
           ...exportBtn,
-          background: busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.card2 : C.accent,
-          color: busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.dim : "#fff",
-          border: `1px solid ${busy || !subject.trim() || !body.trim() || (target === "test" && !testEmail.trim()) ? C.border : C.accent}`,
+          background: busy || !subject.trim() || !body.trim() || (target === "test" && mode === "email" && !testEmail.trim()) ? C.card2 : (mode === "profile" ? C.green : C.accent),
+          color: busy || !subject.trim() || !body.trim() || (target === "test" && mode === "email" && !testEmail.trim()) ? C.dim : "#fff",
+          border: `1px solid ${busy || !subject.trim() || !body.trim() || (target === "test" && mode === "email" && !testEmail.trim()) ? C.border : (mode === "profile" ? C.green : C.accent)}`,
         }}
       >
-        {busy ? "Отправляю..." : target === "test" ? "Тестовое письмо" : "Отправить всем"}
+        {busy ? "Отправляю..." : mode === "profile" ? "Отправить в профиль" : target === "test" ? "Тестовое письмо" : "Отправить по почте"}
       </button>
       {result && (
         <p style={{ color: result.includes("Ошибка") ? C.red : C.green, fontSize: 12, marginTop: 8 }}>{result}</p>

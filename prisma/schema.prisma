@@ -48,6 +48,7 @@ model User {
   applications  Application[]
   evaluations   Evaluation[]
   assignments   JuryAssignment[]
+  notifications Notification[]
   createdAt     DateTime         @default(now())
 }
 
@@ -185,4 +186,20 @@ model PasswordReset {
   createdAt DateTime @default(now())
 
   @@index([email])
+}
+
+// Уведомления в профиле пользователя
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      String   @default("info")   // info | warning | success | system
+  link      String?                      // URL для перехода по клику
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }

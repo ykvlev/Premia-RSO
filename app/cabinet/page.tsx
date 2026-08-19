@@ -5,6 +5,7 @@ import { db, safeDb } from "@/lib/db";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { CabinetTheme } from "@/components/cabinet-theme";
 import { DeadlineTimer } from "@/components/deadline-timer";
+import { NotificationBell } from "@/components/notification-bell";
 import type { AppStatus } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Личный кабинет" };
@@ -169,18 +170,21 @@ export default async function CabinetPage() {
 
   return (
     <CabinetTheme>
-      <p
-        style={{
-          color: "var(--cab-faint)",
-          fontSize: 12,
-          fontWeight: 500,
-          textTransform: "uppercase",
-          letterSpacing: "1.2px",
-          marginBottom: 8,
-        }}
-      >
-        Личный кабинет
-      </p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <p
+          style={{
+            color: "var(--cab-faint)",
+            fontSize: 12,
+            fontWeight: 500,
+            textTransform: "uppercase",
+            letterSpacing: "1.2px",
+            margin: 0,
+          }}
+        >
+          Личный кабинет
+        </p>
+        <NotificationBell />
+      </div>
       <h1 style={{ color: "var(--cab-text)", fontSize: 30, fontWeight: 800, margin: "0 0 6px" }}>
         Здравствуйте, {session.user.name || "участник"}!
       </h1>
