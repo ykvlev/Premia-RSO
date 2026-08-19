@@ -237,6 +237,42 @@ export async function impersonateUser(
   }
 }
 
+// ── Test Email ──────────────────────────────────────────────────────────────
+
+export async function sendTestEmail(
+  to: string,
+  subject: string,
+  body: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+
+  if (!process.env.SMTP_HOST) {
+    return { ok: false, error: "SMTP не настроен" };
+  }
+
+  try {
+    const { sendMail } = await import("@/lib/mail");
+    await sendMail({
+      to,
+      subject,
+      text: body,
+      html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+        <div style="border-bottom:3px solid #0804ff;padding-bottom:12px;margin-bottom:20px;">
+          <strong style="color:#0804ff;font-size:18px;">Труд Крут</strong>
+        </div>
+        <div style="line-height:1.6;color:#333;">${body.replace(/\n/g, "<br/>")}</div>
+        <div style="margin-top:24px;padding-top:12px;border-top:1px solid #eee;color:#999;font-size:12px;">
+          Национальная премия «Труд крут» · Российские студенческие отряды
+        </div>
+      </div>`,
+    });
+    return { ok: true };
+  } catch (e: any) {
+    recordError(e, "sendTestEmail");
+    return { ok: false, error: e?.message || "Ошибка отправки" };
+  }
+}
+
 // ── Mass Email ──────────────────────────────────────────────────────────────
 
 export async function sendMassEmail(
