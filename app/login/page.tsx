@@ -152,10 +152,7 @@ export default async function LoginPage() {
               fontFamily: F,
               fontWeight: 600,
               textDecoration: "none",
-              transition: "color 0.15s",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#f2f0ec")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#9a9aa4")}
           >
             Регистрация
           </a>
