@@ -145,8 +145,7 @@ function Stepper({ status }: { status: AppStatus }) {
 export default async function CabinetPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  const email = session.user.email;
-
+  const email = session.user.email ?? "";
   const userId = session.user.id;
 
   const [apps, season, user]: [any[], { endAt: Date } | null, any] = await safeDb(
