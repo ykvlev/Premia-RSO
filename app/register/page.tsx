@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { LoginForm } from "@/components/login-form";
+import { RegisterForm } from "@/components/register-form";
 import { VkLoginButton } from "@/components/vk-login-button";
 
-export const metadata: Metadata = { title: "Вход" };
+export const metadata: Metadata = { title: "Регистрация" };
 
 const F = "var(--font-onest), sans-serif";
 
-/** Вход для жюри и организаторов. Уже вошёл — уводим по роли. */
-export default async function LoginPage() {
+/** Регистрация нового участника. Уже вошёл — редирект. */
+export default async function RegisterPage() {
   const session = await auth();
   if (session?.user) {
     const target =
@@ -34,7 +34,6 @@ export default async function LoginPage() {
         padding: "40px 20px",
       }}
     >
-      {/* мягкое синее свечение сверху */}
       <div
         style={{
           position: "absolute",
@@ -45,8 +44,7 @@ export default async function LoginPage() {
         }}
       />
 
-      <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
-        {/* назад на сайт */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 440 }}>
         <a
           href="/"
           style={{
@@ -61,7 +59,6 @@ export default async function LoginPage() {
           ← На сайт
         </a>
 
-        {/* логотип */}
         <div style={{ marginBottom: 28 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -84,7 +81,6 @@ export default async function LoginPage() {
           </p>
         </div>
 
-        {/* заголовок */}
         <h1
           style={{
             color: "#f2f0ec",
@@ -96,7 +92,7 @@ export default async function LoginPage() {
             marginBottom: 10,
           }}
         >
-          Вход в панель
+          Регистрация
         </h1>
         <p
           style={{
@@ -107,11 +103,9 @@ export default async function LoginPage() {
             marginBottom: 28,
           }}
         >
-          Для жюри и организаторов премии. Подача заявок — без входа, на странице
-          «Подать заявку».
+          Создайте аккаунт для подачи заявок на премию «Труд крут».
         </p>
 
-        {/* карточка с формой */}
         <div
           style={{
             background: "#121216",
@@ -120,7 +114,7 @@ export default async function LoginPage() {
             padding: "28px 26px",
           }}
         >
-          <LoginForm />
+          <RegisterForm />
         </div>
 
         {/* Divider */}
@@ -151,9 +145,9 @@ export default async function LoginPage() {
             marginTop: 20,
           }}
         >
-          Нет аккаунта?{" "}
-          <a href="/register" style={{ color: "#0804ff", textDecoration: "none" }}>
-            Зарегистрироваться
+          Уже есть аккаунт?{" "}
+          <a href="/login" style={{ color: "#0804ff", textDecoration: "none" }}>
+            Войти
           </a>
         </p>
 

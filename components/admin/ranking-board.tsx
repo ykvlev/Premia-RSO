@@ -2,6 +2,17 @@
 
 import { useState } from "react";
 import { updateApplicationStatus } from "@/app/admin/actions";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  Legend,
+  Treemap,
+} from "recharts";
 
 const F = "var(--font-onest), sans-serif";
 
@@ -19,6 +30,75 @@ export type RankNomination = {
   title: string;
   apps: RankApp[];
 };
+
+const COLORS = [
+  "#0804ff", "#22c55e", "#f59e0b", "#ef4444",
+  "#8b5cf6", "#06b6d4", "#f97316", "#ec4899",
+];
+
+function NominationChart({ apps }: { apps: RankApp[] }) {
+  const data = apps
+    .filter((a) => a.avg !== null)
+    .slice(0, 8)
+    .map((a) => ({
+      name: a.nominee.length > 18 ? a.nominee.slice(0, 16) + "…" : a.nominee,
+      avg: a.avg,
+      status: a.status,
+    }));
+
+  if (data.length === 0) return null;
+
+  return (
+    <div style={{ width: "100%", height: 220, marginBottom: 16 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
+          <XAxis
+            dataKey="name"
+            tick={{ fill: "#6a6a72", fontSize: 10, fontFamily: F }}
+            axisLine={false}
+            tickLine={false}
+            interval={0}
+            angle={-30}
+            textAnchor="end"
+            height={50}
+          />
+          <YAxis
+            tick={{ fill: "#6a6a72", fontSize: 10 }}
+            axisLine={false}
+            tickLine={false}
+            domain={[0, 100]}
+          />
+          <Tooltip
+            contentStyle={{
+              background: "#121216",
+              border: "1px solid #2a2a32",
+              borderRadius: 8,
+              fontFamily: F,
+              fontSize: 12,
+              color: "#f2f0ec",
+            }}
+            formatter={(value) => [Number(value ?? 0), "Ср. балл"]}
+            labelStyle={{ color: "#9a9aa4", fontSize: 11 }}
+          />
+          <Bar dataKey="avg" radius={[4, 4, 0, 0]} maxBarSize={36}>
+            {data.map((entry, i) => (
+              <Cell
+                key={i}
+                fill={
+                  entry.status === "winner"
+                    ? "#0804ff"
+                    : entry.status === "approved" || entry.status === "finalist"
+                      ? "#22c55e"
+                      : COLORS[i % COLORS.length]
+                }
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const STATUS_LABEL: Record<string, string> = {
   new: "Отправлена",
@@ -142,6 +222,7 @@ export function RankingBoard({ nominations }: { nominations: RankNomination[] })
             {n.title}{" "}
             <span style={{ color: "#6a6a72", fontWeight: 500 }}>· {n.apps.length}</span>
           </p>
+          <NominationChart apps={n.apps} />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {n.apps.map((a, i) => (
               <Row key={a.id} app={a} place={i} />

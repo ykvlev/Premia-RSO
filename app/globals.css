@@ -121,7 +121,7 @@
 }
 
 /*
-  Значения токенов = палитра РСО. Светлая тема — единственная.
+  Значения токенов = палитра РСО. Светлая тема — основная.
   Острые углы: --radius: 0. Пилюли делаются точечно (кнопки, овал-лого).
 */
 :root {
@@ -164,6 +164,46 @@
   --sidebar-accent: #eeeeee;
   --sidebar-accent-foreground: #000000;
   --sidebar-border: #000000;
+  --sidebar-ring: #0804ff;
+}
+
+/* Тёмная тема (переключается через next-themes класс .dark на <html>) */
+.dark {
+  --background: #08080a;
+  --foreground: #f2f0ec;
+  --card: #0d0d12;
+  --card-foreground: #f2f0ec;
+  --popover: #0d0d12;
+  --popover-foreground: #f2f0ec;
+
+  --primary: #0804ff;
+  --primary-foreground: #ffffff;
+  --secondary: #1e1e28;
+  --secondary-foreground: #c8c8d0;
+  --muted: #1a1a22;
+  --muted-foreground: #9a9aa4;
+  --accent: #1e1e28;
+  --accent-foreground: #f2f0ec;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #2a2a32;
+  --input: #2a2a32;
+  --ring: #0804ff;
+
+  --chart-1: #0804ff;
+  --chart-2: #4cacf7;
+  --chart-3: #22c55e;
+  --chart-4: #f59e0b;
+  --chart-5: #8b5cf6;
+
+  --sidebar: #0d0d12;
+  --sidebar-foreground: #f2f0ec;
+  --sidebar-primary: #0804ff;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #1e1e28;
+  --sidebar-accent-foreground: #f2f0ec;
+  --sidebar-border: #2a2a32;
   --sidebar-ring: #0804ff;
 }
 

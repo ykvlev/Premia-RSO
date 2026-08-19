@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/auth-helpers";
-import { db } from "@/lib/db";
+import { db, safeDb } from "@/lib/db";
 import { AdminLayoutShell } from "@/components/admin/admin-layout-shell";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await requireRole("admin", "superadmin");
   const isSuper = session.user.role === "superadmin";
 
-  const [appsCount, newCount] = await Promise.all([
-    db.application.count(),
-    db.application.count({ where: { status: "new" } }),
-  ]);
+  const { appsCount, newCount } = await safeDb(
+    async () => {
+      const [ac, nc] = await Promise.all([
+        db.application.count(),
+        db.application.count({ where: { status: "new" } }),
+      ]);
+      return { appsCount: ac, newCount: nc };
+    },
+    { appsCount: 0, newCount: 0 },
+  );
 
   return (
     <div className="min-h-full flex-1">

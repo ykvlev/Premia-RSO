@@ -15,3 +15,18 @@ function createClient() {
 export const db = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+
+/**
+ * Безопасный запрос к БД:
+ *  - прод (NODE_ENV=production): ошибки пробрасываются как есть (ловятся Sentry / error boundary)
+ *  - dev без БД: возвращает fallback, сайт работает
+ */
+export async function safeDb<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (process.env.NODE_ENV === "production") throw err;
+    console.warn("[db] Dev fallback (no database):", (err as Error).message?.slice(0, 120));
+    return fallback;
+  }
+}

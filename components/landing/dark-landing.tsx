@@ -22,6 +22,7 @@ import UnionD from "./imports/Union-3/index";
 import VectorD from "./imports/Vector-3/index";
 import Rso from "./imports/rso/index";
 import VectorE from "./imports/Vector-4/index";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -544,6 +545,7 @@ function Header({
           ))}
         </nav>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <button
             onClick={() => router.push("/vhod")}
             className="hdr-login cursor-pointer rounded-full border border-[#2a2a32] bg-transparent px-5 py-3 text-[15px] font-medium text-[#f2f0ec] transition-all duration-200 hover:border-[#4a4a56]"

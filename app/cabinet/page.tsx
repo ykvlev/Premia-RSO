@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import { db, safeDb } from "@/lib/db";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { CabinetTheme } from "@/components/cabinet-theme";
+import { DeadlineTimer } from "@/components/deadline-timer";
 import type { AppStatus } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Личный кабинет" };
@@ -146,11 +147,19 @@ export default async function CabinetPage() {
   if (!session?.user?.email) redirect("/login");
   const email = session.user.email;
 
-  const apps = await db.application.findMany({
-    where: { email },
-    include: { nomination: { select: { title: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [apps, season]: [any[], { endAt: Date } | null] = await safeDb(
+    async () => {
+      const a = await db.application.findMany({
+        where: { email },
+        include: { nomination: { select: { title: true } } },
+        orderBy: { createdAt: "desc" },
+      });
+      const s = await db.season.findFirst({ where: { isActive: true }, select: { endAt: true } });
+      return [a, s] as const;
+    },
+    [[] as any[], null],
+  );
 
   return (
     <CabinetTheme>
@@ -169,10 +178,46 @@ export default async function CabinetPage() {
       <h1 style={{ color: "var(--cab-text)", fontSize: 30, fontWeight: 800, margin: "0 0 6px" }}>
         Здравствуйте, {session.user.name || "участник"}!
       </h1>
-      <p style={{ color: "var(--cab-muted)", fontSize: 14, margin: "0 0 32px" }}>
+      <p style={{ color: "var(--cab-muted)", fontSize: 14, margin: "0 0 24px" }}>
         Ваши заявки и их статусы. Одним аккаунтом можно подать заявки на разные
         номинации.
       </p>
+
+      {/* Таймер до закрытия приёма заявок */}
+      {season && <DeadlineTimer endAt={season.endAt.toISOString()} />}
+
+      {/* Кнопки навигации */}
+      <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 24, flexWrap: "wrap" }}>
+        <a
+          href="/apply"
+          style={{
+            background: "#0804ff",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 600,
+            borderRadius: 999,
+            padding: "12px 22px",
+            textDecoration: "none",
+          }}
+        >
+          Подать заявку
+        </a>
+        <a
+          href="/profile"
+          style={{
+            background: "var(--cab-surface)",
+            color: "var(--cab-text)",
+            border: "1px solid var(--cab-border)",
+            fontSize: 14,
+            fontWeight: 600,
+            borderRadius: 999,
+            padding: "12px 22px",
+            textDecoration: "none",
+          }}
+        >
+          Заполнить профиль
+        </a>
+      </div>
 
       {apps.length === 0 ? (
         <div
@@ -205,7 +250,7 @@ export default async function CabinetPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {apps.map((a) => {
-            const st = STATUS[a.status];
+            const st = STATUS[a.status as AppStatus];
             const nominee =
               (a.payload as { nomineeFio?: string } | null)?.nomineeFio || a.contactFio;
             return (

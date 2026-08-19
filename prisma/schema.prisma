@@ -30,15 +30,25 @@ enum AppStatus {
 }
 
 model User {
-  id           String           @id @default(cuid())
-  fio          String
-  email        String           @unique
-  passwordHash String
-  role         Role             @default(participant)
-  permissions  Json? // права жюри: {score, comment, changeStatus, viewContacts}
-  evaluations  Evaluation[]
-  assignments  JuryAssignment[]
-  createdAt    DateTime         @default(now())
+  id            String           @id @default(cuid())
+  fio           String
+  email         String           @unique
+  phone         String?
+  gender        String? // "male" | "female"
+  birthDate     DateTime?
+  city          String?
+  region        String?
+  telegram      String?
+  vkUrl         String?
+  avatarUrl     String?
+  passwordHash  String
+  emailVerified DateTime?
+  role          Role             @default(participant)
+  permissions   Json? // права жюри: {score, comment, changeStatus, viewContacts}
+  applications  Application[]
+  evaluations   Evaluation[]
+  assignments   JuryAssignment[]
+  createdAt     DateTime         @default(now())
 }
 
 model Season {
@@ -68,6 +78,8 @@ model Application {
   id              String       @id @default(cuid())
   nominationId    String
   nomination      Nomination   @relation(fields: [nominationId], references: [id])
+  userId          String?
+  user            User?        @relation(fields: [userId], references: [id])
   participantType String
   orgName         String
   inn             String
@@ -161,4 +173,16 @@ model JuryAssignment {
   nomination   Nomination @relation(fields: [nominationId], references: [id])
 
   @@unique([juryUserId, nominationId])
+}
+
+// Токены для сброса/восстановления пароля по email.
+model PasswordReset {
+  id        String   @id @default(cuid())
+  email     String
+  code      String // 6-значный код
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth-helpers";
-import { db } from "@/lib/db";
+import { db, safeDb } from "@/lib/db";
 import { LogoutLink } from "@/components/logout-link";
 import {
   JuryBoard,
@@ -37,80 +37,86 @@ export default async function JuryPage() {
   const juryUserId = session.user.id;
   const isAdmin = session.user.role === "admin" || session.user.role === "superadmin";
 
-  // Права: у админа — все; у жюри — из профиля (по умолчанию score+comment).
-  const me = await db.user.findUnique({
-    where: { id: juryUserId },
-    select: { permissions: true },
-  });
-  const pr = (me?.permissions ?? {}) as Record<string, unknown>;
-  const perms: JuryPerms = isAdmin
-    ? {
-        score: true,
-        comment: true,
-        changeStatus: true,
-        viewContacts: true,
-        blindScoring: false,
-      }
-    : {
-        score: pr.score !== false,
-        comment: pr.comment !== false,
-        changeStatus: pr.changeStatus === true,
-        viewContacts: pr.viewContacts === true,
-        blindScoring: pr.blindScoring === true,
-      };
+  const { perms, items } = await safeDb(async () => {
+    // Права: у админа — все; у жюри — из профиля (по умолчанию score+comment).
+    const me = await db.user.findUnique({
+      where: { id: juryUserId },
+      select: { permissions: true },
+    });
+    const pr = (me?.permissions ?? {}) as Record<string, unknown>;
+    const perms: JuryPerms = isAdmin
+      ? {
+          score: true,
+          comment: true,
+          changeStatus: true,
+          viewContacts: true,
+          blindScoring: false,
+        }
+      : {
+          score: pr.score !== false,
+          comment: pr.comment !== false,
+          changeStatus: pr.changeStatus === true,
+          viewContacts: pr.viewContacts === true,
+          blindScoring: pr.blindScoring === true,
+        };
 
-  const assignments = await db.juryAssignment.findMany({
-    where: { juryUserId },
-    select: { nominationId: true },
-  });
-  const assignedIds = assignments.map((a) => a.nominationId);
+    const assignments = await db.juryAssignment.findMany({
+      where: { juryUserId },
+      select: { nominationId: true },
+    });
+    const assignedIds = assignments.map((a) => a.nominationId);
 
-  // Админ видит все заявки; жюри — только по закреплённым номинациям (нет закреплений → ничего).
-  const where = isAdmin
-    ? {}
-    : { nominationId: { in: assignedIds.length ? assignedIds : ["__none__"] } };
+    // Админ видит все заявки; жюри — только по закреплённым номинациям (нет закреплений → ничего).
+    const where = isAdmin
+      ? {}
+      : { nominationId: { in: assignedIds.length ? assignedIds : ["__none__"] } };
 
-  const [rows, recusals] = await Promise.all([
-    db.application.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        nomination: { select: { title: true, criteria: true } },
-        evaluations: {
-          where: { juryUserId },
-          select: { scores: true, comment: true },
+    const [rows, recusals] = await Promise.all([
+      db.application.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          nomination: { select: { title: true, criteria: true } },
+          evaluations: {
+            where: { juryUserId },
+            select: { scores: true, comment: true },
+          },
         },
-      },
-    }),
-    db.juryRecusal.findMany({ where: { juryUserId }, select: { applicationId: true } }),
-  ]);
-  const recusedSet = new Set(recusals.map((r) => r.applicationId));
+      }),
+      db.juryRecusal.findMany({ where: { juryUserId }, select: { applicationId: true } }),
+    ]);
+    const recusedSet = new Set(recusals.map((r) => r.applicationId));
 
-  const items: JuryItem[] = rows.map((a) => {
-    const p = (a.payload ?? {}) as Record<string, unknown>;
-    // Слепая оценка: имя/регион/контакты не отправляем клиенту вообще.
-    const nominee = perms.blindScoring
-      ? `Заявка № ${a.id.slice(-6)}`
-      : (typeof p.nomineeFio === "string" && p.nomineeFio) || a.contactFio || a.orgName;
-    const myEval = a.evaluations[0];
-    const myScores =
-      myEval && myEval.scores && typeof myEval.scores === "object"
-        ? (myEval.scores as Record<string, number>)
-        : {};
-    return {
-      id: a.id,
-      nominationTitle: a.nomination.title,
-      nominee,
-      region: perms.blindScoring ? "" : a.region,
-      submitted: a.createdAt.toLocaleDateString("ru-RU"),
-      status: a.status,
-      criteria: parseCriteria(a.nomination.criteria),
-      myScores,
-      myComment: myEval?.comment ?? "",
-      email: perms.viewContacts && !perms.blindScoring ? a.email : undefined,
-      phone: perms.viewContacts && !perms.blindScoring ? a.phone : undefined,
-      recused: recusedSet.has(a.id),
-    };
+    const items: JuryItem[] = rows.map((a) => {
+      const p = (a.payload ?? {}) as Record<string, unknown>;
+      const nominee = perms.blindScoring
+        ? `Заявка № ${a.id.slice(-6)}`
+        : (typeof p.nomineeFio === "string" && p.nomineeFio) || a.contactFio || a.orgName;
+      const myEval = a.evaluations[0];
+      const myScores =
+        myEval && myEval.scores && typeof myEval.scores === "object"
+          ? (myEval.scores as Record<string, number>)
+          : {};
+      return {
+        id: a.id,
+        nominationTitle: a.nomination.title,
+        nominee,
+        region: perms.blindScoring ? "" : a.region,
+        submitted: a.createdAt.toLocaleDateString("ru-RU"),
+        status: a.status,
+        criteria: parseCriteria(a.nomination.criteria),
+        myScores,
+        myComment: myEval?.comment ?? "",
+        email: perms.viewContacts && !perms.blindScoring ? a.email : undefined,
+        phone: perms.viewContacts && !perms.blindScoring ? a.phone : undefined,
+        recused: recusedSet.has(a.id),
+      };
+    });
+
+    return { perms, items };
+  }, {
+    perms: { score: true, comment: true, changeStatus: false, viewContacts: false, blindScoring: false },
+    items: [] as JuryItem[],
   });
 
   // прогресс считаем без заявок, по которым взят самоотвод

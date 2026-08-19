@@ -20,6 +20,7 @@ import { putObject } from "@/lib/storage";
 import { isAllowedMime, uploadConfig } from "@/lib/upload-config";
 import { brand } from "@/lib/brand";
 import { measure, recordError } from "@/lib/observability";
+import { auth } from "@/auth";
 import type { Prisma } from "@/lib/generated/prisma/client";
 
 export type SubmitResult =
@@ -45,6 +46,10 @@ export async function submitApplication(formData: FormData): Promise<SubmitResul
       formError: "Слишком много заявок с одного адреса. Попробуйте позже.",
     };
   }
+
+  // ── 0.1 userId из сессии (связь заявки с профилем) ────────────────────
+  const session = await auth();
+  const userId = session?.user?.id || null;
 
   // ── 1. Окно приёма (серверная проверка, SPEC §7 п.8) ──────────────────
   const season = await db.season.findFirst({ where: { isActive: true } });
@@ -135,6 +140,7 @@ export async function submitApplication(formData: FormData): Promise<SubmitResul
     data: {
       nominationId: nomination.id,
       participantType: nomination.participantType,
+      userId,
       ...commonData,
       ogrn: commonData.ogrn || null,
       activityField: commonData.activityField || null,
@@ -183,6 +189,9 @@ export type NomineeResult =
 export async function submitNomineeApplication(
   formData: FormData,
 ): Promise<NomineeResult> {
+  const session = await auth();
+  const userId = session?.user?.id || null;
+
   const season = await db.season.findFirst({ where: { isActive: true } });
   const now = new Date();
   if (!season) return { ok: false, error: "Приём заявок закрыт." };
@@ -310,6 +319,7 @@ export async function submitNomineeApplication(
         data: {
           nominationId: nomination.id,
           participantType: g("participantType") || nomination.participantType,
+          userId,
           orgName,
           inn,
           region,

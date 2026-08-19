@@ -5,6 +5,9 @@ const isDev = process.env.NODE_ENV !== "production";
 // SmartCaptcha (Yandex) — источники скрипта/фрейма/соединений капчи.
 // ВАЖНО: виджет грузится с smartcaptcha.cloud.yandex.ru (см. components/apply/smart-captcha.tsx).
 const CAPTCHA = "https://smartcaptcha.cloud.yandex.ru";
+const SENTRY = "https://browser.sentry-cdn.com";
+const YM = "https://mc.yandex.ru";
+const VK = "https://unpkg.com https://id.vk.com https://vk.com";
 
 /**
  * Content-Security-Policy. Осознанные послабления:
@@ -19,12 +22,12 @@ const csp = [
   `object-src 'none'`,
   `frame-ancestors 'none'`,
   `form-action 'self'`,
-  `img-src 'self' data: blob: ${CAPTCHA}`,
+  `img-src 'self' data: blob: ${CAPTCHA} ${YM} ${VK}`,
   `font-src 'self' data:`,
   `style-src 'self' 'unsafe-inline' ${CAPTCHA}`,
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${CAPTCHA}`,
-  `connect-src 'self' ${CAPTCHA}`,
-  `frame-src 'self' ${CAPTCHA}`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${CAPTCHA} ${SENTRY} ${YM} ${VK}`,
+  `connect-src 'self' ${CAPTCHA} https://*.sentry.io ${YM} ${VK}`,
+  `frame-src 'self' ${CAPTCHA} ${VK}`,
   `worker-src 'self' blob:`,
   `upgrade-insecure-requests`,
 ].join("; ");

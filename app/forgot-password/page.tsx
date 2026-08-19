@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { LoginForm } from "@/components/login-form";
-import { VkLoginButton } from "@/components/vk-login-button";
+import { redirect } from "next/navigation";
+import { ForgotPasswordForm } from "@/components/forgot-password-form";
 
-export const metadata: Metadata = { title: "Вход" };
+export const metadata: Metadata = { title: "Восстановление пароля" };
 
 const F = "var(--font-onest), sans-serif";
 
-/** Вход для жюри и организаторов. Уже вошёл — уводим по роли. */
-export default async function LoginPage() {
+export default async function ForgotPasswordPage() {
   const session = await auth();
   if (session?.user) {
     const target =
@@ -34,7 +32,6 @@ export default async function LoginPage() {
         padding: "40px 20px",
       }}
     >
-      {/* мягкое синее свечение сверху */}
       <div
         style={{
           position: "absolute",
@@ -45,10 +42,9 @@ export default async function LoginPage() {
         }}
       />
 
-      <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
-        {/* назад на сайт */}
+      <div style={{ position: "relative", width: "100%", maxWidth: 440 }}>
         <a
-          href="/"
+          href="/login"
           style={{
             display: "inline-block",
             color: "#6a6a72",
@@ -58,10 +54,9 @@ export default async function LoginPage() {
             marginBottom: 36,
           }}
         >
-          ← На сайт
+          ← Назад ко входу
         </a>
 
-        {/* логотип */}
         <div style={{ marginBottom: 28 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -84,7 +79,6 @@ export default async function LoginPage() {
           </p>
         </div>
 
-        {/* заголовок */}
         <h1
           style={{
             color: "#f2f0ec",
@@ -96,7 +90,7 @@ export default async function LoginPage() {
             marginBottom: 10,
           }}
         >
-          Вход в панель
+          Восстановление пароля
         </h1>
         <p
           style={{
@@ -107,11 +101,9 @@ export default async function LoginPage() {
             marginBottom: 28,
           }}
         >
-          Для жюри и организаторов премии. Подача заявок — без входа, на странице
-          «Подать заявку».
+          Укажите email — мы отправим код для смены пароля.
         </p>
 
-        {/* карточка с формой */}
         <div
           style={{
             background: "#121216",
@@ -120,42 +112,8 @@ export default async function LoginPage() {
             padding: "28px 26px",
           }}
         >
-          <LoginForm />
+          <ForgotPasswordForm />
         </div>
-
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "20px 0" }}>
-          <div style={{ flex: 1, height: 1, background: "#2a2a32" }} />
-          <span style={{ color: "#6a6a72", fontSize: 12, fontFamily: F }}>или</span>
-          <div style={{ flex: 1, height: 1, background: "#2a2a32" }} />
-        </div>
-
-        {/* VK Login */}
-        <div
-          style={{
-            background: "#121216",
-            border: "1px solid #2a2a32",
-            borderRadius: 16,
-            padding: "18px 26px",
-          }}
-        >
-          <VkLoginButton />
-        </div>
-
-        <p
-          style={{
-            color: "#6a6a72",
-            fontSize: 13,
-            fontFamily: F,
-            textAlign: "center",
-            marginTop: 20,
-          }}
-        >
-          Нет аккаунта?{" "}
-          <a href="/register" style={{ color: "#0804ff", textDecoration: "none" }}>
-            Зарегистрироваться
-          </a>
-        </p>
 
         <p
           style={{

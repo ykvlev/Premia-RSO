@@ -41,6 +41,10 @@ import {
 import {
   BarChart,
   Bar,
+  AreaChart,
+  Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -55,6 +59,7 @@ import {
   saveApplication,
   deleteApplication,
 } from "@/app/admin/actions";
+import { ProtocolPDFButton } from "./protocol-pdf";
 
 // ─── Nominations ──────────────────────────────────────────────────────────────
 const NOMINATIONS_LIST = [
@@ -1904,6 +1909,8 @@ function DetailView({
             </p>
           </div>
 
+          <ProtocolPDFButton app={local} />
+
           {canEdit && (
             <button
               onClick={handleSave}
@@ -2633,7 +2640,13 @@ function DashboardView({ apps }: { apps: Application[] }) {
             </p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={byDay} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <AreaChart data={byDay} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="gradSubmissions" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#0804ff" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#0804ff" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="name"
                   tick={{ fill: "#6a6a72", fontSize: 11, fontFamily: F }}
@@ -2658,8 +2671,16 @@ function DashboardView({ apps }: { apps: Application[] }) {
                   itemStyle={{ color: "#9a9aa4" }}
                   formatter={(v) => [Number(v), "Заявок"]}
                 />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#0804ff" />
-              </BarChart>
+                <Area
+                  type="monotone"
+                  dataKey="count"
+                  stroke="#0804ff"
+                  strokeWidth={2}
+                  fill="url(#gradSubmissions)"
+                  dot={{ fill: "#0804ff", strokeWidth: 0, r: 3 }}
+                  activeDot={{ fill: "#0804ff", strokeWidth: 2, stroke: "#fff", r: 5 }}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </div>

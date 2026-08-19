@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { fontDisplay, fontHeading, fontBody } from "./fonts";
 import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/components/theme-provider";
+import { SentryInit } from "@/components/sentry-init";
+import { YandexMetrika } from "@/components/yandex-metrika";
 import { CookieConsent } from "@/components/cookie-consent";
 import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
@@ -64,6 +67,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
+      suppressHydrationWarning
       className={cn(
         "h-full antialiased",
         fontDisplay.variable,
@@ -72,7 +76,16 @@ export default function RootLayout({
       )}
     >
       <body className="flex min-h-full flex-col">
-        {children}
+        <SentryInit />
+        <YandexMetrika />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
         <CookieConsent />
         <PwaRegister />
       </body>

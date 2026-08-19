@@ -160,7 +160,12 @@ export function getPerfStats(windowMinutes = 30): PerfStats {
 }
 
 export function getRecentErrors(limit = 30): ErrorEntry[] {
-  return [...store.errors].reverse().slice(0, limit);
+  const errors = [...store.errors].reverse().slice(0, limit);
+  // В продакшене не отправляем стек-трейсы в RSC payload (безопасность)
+  if (process.env.NODE_ENV === "production") {
+    return errors.map(({ stack, ...rest }) => rest);
+  }
+  return errors;
 }
 
 /** Аптайм наблюдателя (мс) — с момента первого импорта модуля в процессе. */

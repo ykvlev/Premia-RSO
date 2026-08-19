@@ -93,6 +93,20 @@ export function LoginForm() {
         />
       </label>
 
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <a
+          href="/forgot-password"
+          style={{
+            color: "#6a6a72",
+            fontSize: 12,
+            fontFamily: F,
+            textDecoration: "none",
+          }}
+        >
+          Забыли пароль?
+        </a>
+      </div>
+
       {error && (
         <div
           style={{

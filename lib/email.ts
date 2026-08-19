@@ -211,3 +211,61 @@ export function renderStatusEmail(o: {
   tl.push(`Номер заявки: ${o.appId}`, `Личный кабинет: ${SITE}/cabinet`, "", `— Оргкомитет, ${brand.org}`);
   return { html, text: tl.join("\n") };
 }
+
+/** Код подтверждения email при регистрации (6 цифр). */
+export function renderVerificationCodeEmail(code: string): { html: string; text: string } {
+  const content = `
+    <tr><td style="padding:30px 28px 4px; font-family:${F};">
+      <div style="font-size:20px; color:#f2f0ec; font-weight:bold; margin-bottom:14px;">Подтверждение email</div>
+      <p style="margin:0 0 12px; font-size:15px; line-height:1.6; color:#c8c8d0;">Для завершения регистрации введите этот код на сайте:</p>
+    </td></tr>
+    <tr><td align="center" style="padding:10px 28px 20px;">
+      <div style="display:inline-block; background:#111119; border:2px solid ${BLUE}; border-radius:14px; padding:20px 48px;">
+        <span style="font-family:'Courier New',monospace; font-size:40px; font-weight:bold; color:${BLUE}; letter-spacing:12px;">${escapeHtml(code)}</span>
+      </div>
+    </td></tr>
+    <tr><td style="padding:0 28px 10px; font-family:${F};">
+      <p style="margin:0; font-size:13px; color:#8a8a92;">Код действителен в течение 10 минут. Если вы не запрашивали регистрацию — просто проигнорируйте это письмо.</p>
+    </td></tr>`;
+  const html = shell({ preheader: `Код подтверждения: ${code}`, contentHtml: content });
+  const text = [
+    "Подтверждение email",
+    "",
+    `Ваш код: ${code}`,
+    "",
+    "Код действителен в течение 10 минут.",
+    "Если вы не запрашивали регистрацию — проигнорируйте это письмо.",
+    "",
+    `— Оргкомитет, ${brand.org}`,
+  ].join("\n");
+  return { html, text };
+}
+
+/** Код восстановления пароля. */
+export function renderPasswordResetEmail(code: string): { html: string; text: string } {
+  const content = `
+    <tr><td style="padding:30px 28px 4px; font-family:${F};">
+      <div style="font-size:20px; color:#f2f0ec; font-weight:bold; margin-bottom:14px;">Восстановление пароля</div>
+      <p style="margin:0 0 12px; font-size:15px; line-height:1.6; color:#c8c8d0;">Мы получили запрос на смену пароля. Введите этот код на сайте:</p>
+    </td></tr>
+    <tr><td align="center" style="padding:10px 28px 20px;">
+      <div style="display:inline-block; background:#111119; border:2px solid ${BLUE}; border-radius:14px; padding:20px 48px;">
+        <span style="font-family:'Courier New',monospace; font-size:40px; font-weight:bold; color:${BLUE}; letter-spacing:12px;">${escapeHtml(code)}</span>
+      </div>
+    </td></tr>
+    <tr><td style="padding:0 28px 10px; font-family:${F};">
+      <p style="margin:0; font-size:13px; color:#8a8a92;">Код действителен в течение 10 минут. Если вы не запрашивали смену пароля — проигнорируйте это письмо.</p>
+    </td></tr>`;
+  const html = shell({ preheader: `Код восстановления: ${code}`, contentHtml: content });
+  const text = [
+    "Восстановление пароля",
+    "",
+    `Ваш код: ${code}`,
+    "",
+    "Код действителен в течение 10 минут.",
+    "Если вы не запрашивали смену пароля — проигнорируйте это письмо.",
+    "",
+    `— Оргкомитет, ${brand.org}`,
+  ].join("\n");
+  return { html, text };
+}
