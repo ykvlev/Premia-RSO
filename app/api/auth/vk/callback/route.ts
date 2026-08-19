@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hashSync } from "bcryptjs";
 import { db } from "@/lib/db";
+import { encode } from "next-auth/jwt";
 
 const VK_APP_ID = process.env.VK_ID_APP_ID ?? "";
 const VK_APP_SECRET = process.env.VK_ID_APP_SECRET ?? "";
@@ -13,14 +14,11 @@ const VK_REDIRECT_URI = process.env.VK_REDIRECT_URI ?? "";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
-  // VK returned an error
   if (error) {
-    const desc = url.searchParams.get("error_description") || error;
-    console.error("[vk-callback] VK error:", error, desc);
-    return NextResponse.redirect(new URL(`/login?error=vk_${encodeURIComponent(error)}`, request.url));
+    console.error("[vk-callback] VK error:", error, url.searchParams.get("error_description"));
+    return NextResponse.redirect(new URL("/login?error=vk_denied", request.url));
   }
 
   if (!code) {
@@ -28,79 +26,58 @@ export async function GET(request: Request) {
   }
 
   if (!VK_APP_ID || !VK_APP_SECRET) {
-    console.error("[vk-callback] VK_ID_APP_ID or VK_ID_APP_SECRET not set");
+    console.error("[vk-callback] VK not configured");
     return NextResponse.redirect(new URL("/login?error=vk_not_configured", request.url));
   }
 
   try {
-    // 1. Обмен code на access_token
-    const tokenUrl = `https://id.vk.com/oauth2/auth` +
-      `?act=exchange_code` +
-      `&client_id=${VK_APP_ID}` +
-      `&client_secret=${VK_APP_SECRET}` +
-      `&redirect_uri=${encodeURIComponent(VK_REDIRECT_URI)}` +
-      `&code=${code}`;
+    const tokenRes = await fetch(
+      `https://id.vk.com/oauth2/auth?act=exchange_code` +
+        `&client_id=${VK_APP_ID}` +
+        `&client_secret=${VK_APP_SECRET}` +
+        `&redirect_uri=${encodeURIComponent(VK_REDIRECT_URI)}` +
+        `&code=${code}`,
+      { method: "POST" },
+    );
 
-    console.log("[vk-callback] Exchanging code for token...");
-
-    const tokenRes = await fetch(tokenUrl, { method: "POST" });
     const tokenText = await tokenRes.text();
-    console.log("[vk-callback] Token response:", tokenRes.status, tokenText.substring(0, 200));
+    console.log("[vk-callback] Token exchange:", tokenRes.status, tokenText.slice(0, 200));
 
     if (!tokenRes.ok) {
-      return NextResponse.redirect(new URL(`/login?error=token_exchange_failed`, request.url));
+      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", request.url));
     }
 
-    let tokenData: Record<string, unknown>;
-    try {
-      tokenData = JSON.parse(tokenText);
-    } catch {
-      console.error("[vk-callback] Failed to parse token response");
-      return NextResponse.redirect(new URL("/login?error=token_parse_error", request.url));
-    }
-
-    const accessToken = tokenData.access_token as string | undefined;
+    const tokenData = JSON.parse(tokenText);
+    const accessToken = tokenData.access_token;
 
     if (!accessToken) {
-      console.error("[vk-callback] No access_token in response:", tokenData);
       return NextResponse.redirect(new URL("/login?error=no_access_token", request.url));
     }
 
-    // 2. Получаем данные пользователя
-    const userRes = await fetch(
-      `https://id.vk.com/oauth2/user_info?access_token=${accessToken}`,
-    );
+    const userRes = await fetch(`https://id.vk.com/oauth2/user_info?access_token=${accessToken}`);
     const userText = await userRes.text();
-    console.log("[vk-callback] User info response:", userRes.status, userText.substring(0, 200));
+    console.log("[vk-callback] User info:", userRes.status, userText.slice(0, 200));
 
     if (!userRes.ok) {
       return NextResponse.redirect(new URL("/login?error=user_info_failed", request.url));
     }
 
-    const userData = JSON.parse(userText);
-    const vkUser = userData.user;
-
+    const vkUser = JSON.parse(userText).user;
     if (!vkUser?.user_id) {
-      console.error("[vk-callback] No user in response:", userData);
       return NextResponse.redirect(new URL("/login?error=no_vk_user", request.url));
     }
 
     const vkId = String(vkUser.user_id);
     const email = vkUser.email || null;
-    const displayName =
-      [vkUser.last_name, vkUser.first_name].filter(Boolean).join(" ") || null;
+    const displayName = [vkUser.last_name, vkUser.first_name].filter(Boolean).join(" ") || null;
 
-    console.log("[vk-callback] VK user:", vkId, email, displayName);
-
-    // 3. Ищем или создаём пользователя
     let user = await db.user.findFirst({ where: { vkUrl: `vk:${vkId}` } });
-
     if (!user && email) {
       user = await db.user.findUnique({ where: { email } });
     }
 
     if (!user) {
-      const randomHash = hashSync(`vk_${Date.now()}_${Math.random()}`, 10);
+      const randomHash = hashSync(`vk_${Date.now()}`, 10);
       user = await db.user.create({
         data: {
           fio: displayName || `VK User ${vkId}`,
@@ -111,7 +88,6 @@ export async function GET(request: Request) {
           role: "participant",
         },
       });
-      console.log("[vk-callback] Created user:", user.id);
     } else {
       await db.user.update({
         where: { id: user.id },
@@ -121,26 +97,18 @@ export async function GET(request: Request) {
           fio: user.fio || displayName || `VK User ${vkId}`,
         },
       });
-      console.log("[vk-callback] Found existing user:", user.id);
     }
 
-    // 4. Set session cookie using NextAuth signIn
-    // We create a signed token and set it as session cookie
-    const { SignJWT } = await import("jose");
-    const secret = new TextEncoder().encode(process.env.AUTH_SECRET || "");
+    const sessionToken = await encode({
+      secret: process.env.AUTH_SECRET || "",
+      token: {
+        sub: user.id,
+        email: user.email,
+        name: user.fio,
+        role: user.role,
+      },
+    });
 
-    const token = await new SignJWT({
-      sub: user.id,
-      email: user.email,
-      name: user.fio,
-      role: user.role,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("30d")
-      .sign(secret);
-
-    // Determine redirect based on role
     const target =
       user.role === "jury"
         ? "/jury"
@@ -149,28 +117,17 @@ export async function GET(request: Request) {
           : "/cabinet";
 
     const response = NextResponse.redirect(new URL(target, request.url));
-
-    // Set the next-auth session cookie
-    // NextAuth v5 uses "authjs.session-token" for secure sessions
-    response.cookies.set("authjs.session-token", token, {
+    response.cookies.set("authjs.session-token", sessionToken, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
       path: "/",
-      maxAge: 30 * 24 * 60 * 60, // 30 days
-    });
-    // Also set the non-secure variant for development
-    response.cookies.set("authjs.session-token", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: 8 * 60 * 60,
     });
 
     return response;
   } catch (err) {
-    console.error("[vk-callback] Error:", err);
+    console.error("[vk-callback] Server error:", err);
     return NextResponse.redirect(new URL("/login?error=server_error", request.url));
   }
 }

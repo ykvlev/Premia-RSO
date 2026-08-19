@@ -20,13 +20,14 @@ export function VkLoginButton() {
     setLoading(true);
     const state = crypto.randomUUID();
     sessionStorage.setItem("vk_oauth_state", state);
-    window.location.href =
+    const url =
       `https://id.vk.com/auth` +
       `?client_id=${appId}` +
-      `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
+      `&redirect_uri=${encodeURIComponent(String(redirectUrl))}` +
       `&response_type=code` +
       `&display=page` +
       `&state=${state}`;
+    window.location.href = url;
   }
 
   return (
