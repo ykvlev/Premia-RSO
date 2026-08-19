@@ -4,7 +4,6 @@
  */
 import { getRecentRequests, getRecentErrors, type RequestSample, type ErrorEntry } from "@/lib/observability";
 
-export const runtime = "node";
 export const dynamic = "force-dynamic";
 
 type LogEntry = {

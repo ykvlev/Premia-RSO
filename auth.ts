@@ -223,18 +223,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "vkid" && user) {
         token.role = user.role ?? "participant";
       }
-      // Force-logout: проверяем блоклист сессий
-      if (token?.id && typeof token.id === "string") {
-        try {
-          const { isSessionBlocked } = require("@/lib/session-blocklist");
-          if (isSessionBlocked(token.id)) {
-            return {} as any; // пустой токен → сессия сброшена
-          }
-        } catch { /* блоклист недоступен — пропускаем */ }
-      }
       return token;
     },
     session({ session, token }) {
+      // Force-logout: если пользователь в блоклисте — сбрасываем сессию
+      if (token?.id && typeof token.id === "string") {
+        try {
+          // Синхронное чтение файла блоклиста
+          const { readFileSync, existsSync } = require("node:fs");
+          const { join } = require("node:path");
+          const path = join(process.cwd(), "session-blocklist.json");
+          if (existsSync(path)) {
+            const list = JSON.parse(readFileSync(path, "utf8"));
+            if (list.some((b: any) => b.userId === token.id)) {
+              return {} as any;
+            }
+          }
+        } catch { /* блоклист недоступен — пропускаем */ }
+      }
       session.user.id = token.id;
       session.user.role = token.role;
       return session;
