@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { recordRequest } from "@/lib/observability";
 import { isMaintenanceActive } from "@/lib/maintenance";
+import { isIpBanned } from "@/lib/ip-ban";
 
 /**
  * Proxy (Next 16, Node-рантайм по умолчанию) — журнал запросов + maintenance mode.
@@ -25,6 +26,25 @@ export function proxy(request: NextRequest) {
     }
   } catch {
     /* fallback: если файл не читается — пропускаем */
+  }
+
+  // ── IP Ban: блокируем забаненные IP ───────────────────────────────────────
+  try {
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "";
+    if (ip) {
+      const { banned, reason } = isIpBanned(ip);
+      if (banned) {
+        return new NextResponse(
+          JSON.stringify({ error: "Blocked", reason: reason || "Access denied" }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        );
+      }
+    }
+  } catch {
+    /* ban check failure — don't block */
   }
 
   // ── Request logging ──────────────────────────────────────────────────────

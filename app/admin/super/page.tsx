@@ -376,9 +376,13 @@ export default async function SuperPage() {
 
     const maintenance = getMaintenanceInfo();
 
+    const { getBans } = await import("@/lib/ip-ban");
+    const bans = getBans();
+
     data.disk = disk;
     data.git = git;
     data.maintenance = maintenance;
+    data.bans = bans;
   } catch {
     // БД недоступна — пустой дашборд
     const perf = getPerfStats(30);
@@ -425,6 +429,7 @@ export default async function SuperPage() {
       disk: { totalGB: 0, usedGB: 0, freeGB: 0, pct: 0 },
       git: { branch: "", commit: "", message: "", author: "", date: "" },
       maintenance: getMaintenanceInfo(),
+      bans: [],
     };
   }
 

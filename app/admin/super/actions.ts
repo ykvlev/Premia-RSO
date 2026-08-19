@@ -9,6 +9,7 @@ import {
   deactivateMaintenance,
   getMaintenanceInfo,
 } from "@/lib/maintenance";
+import { banIp, unbanIp, getBans } from "@/lib/ip-ban";
 
 /** Очистить буфер ошибок наблюдаемости. Только супер-админ. */
 export async function clearErrorBuffer(): Promise<{ ok: boolean; cleared: number }> {
@@ -109,4 +110,178 @@ export async function setSeasonActive(
     recordError(e, "setSeasonActive");
     return { ok: false, error: "Не удалось изменить сезон." };
   }
+}
+
+// ── IP Ban ──────────────────────────────────────────────────────────────────
+
+export async function getBanList() {
+  await requireRole("superadmin");
+  return getBans();
+}
+
+export async function addIpBan(
+  ip: string,
+  reason: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  if (!ip || !/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/.test(ip.trim())) {
+    return { ok: false, error: "Некорректный IP-адрес" };
+  }
+  banIp(ip.trim(), reason || "Banned by admin", "superadmin");
+  revalidatePath("/admin/super");
+  return { ok: true };
+}
+
+export async function removeIpBan(
+  ip: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  const removed = unbanIp(ip.trim());
+  revalidatePath("/admin/super");
+  return removed ? { ok: true } : { ok: false, error: "IP не найден в банлисте" };
+}
+
+// ── Integration Test ────────────────────────────────────────────────────────
+
+export async function testIntegrations(): Promise<{
+  smtp: { ok: boolean; detail: string };
+  telegram: { ok: boolean; detail: string };
+  s3: { ok: boolean; detail: string };
+}> {
+  await requireRole("superadmin");
+
+  // SMTP
+  let smtp = { ok: false, detail: "Не настроен" };
+  try {
+    if (process.env.SMTP_HOST) {
+      const nodemailer = require("nodemailer");
+      const transport = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT) || 587,
+        secure: process.env.SMTP_SECURE === "true",
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
+        tls: { rejectUnauthorized: false },
+        connectionTimeout: 5000,
+      });
+      await transport.verify();
+      smtp = { ok: true, detail: `${process.env.SMTP_HOST}:${process.env.SMTP_PORT || 587}` };
+    }
+  } catch (e: any) {
+    smtp = { ok: false, detail: e?.message || "Ошибка" };
+  }
+
+  // Telegram
+  let telegram = { ok: false, detail: "Не настроен" };
+  try {
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      const res = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json();
+      telegram = data.ok
+        ? { ok: true, detail: `@${data.result.username}` }
+        : { ok: false, detail: data.description || "Ошибка" };
+    }
+  } catch (e: any) {
+    telegram = { ok: false, detail: e?.message || "Ошибка" };
+  }
+
+  // S3
+  let s3 = { ok: false, detail: "Не настроен" };
+  try {
+    if (process.env.S3_ENDPOINT && process.env.S3_BUCKET) {
+      const res = await fetch(`${process.env.S3_ENDPOINT}/${process.env.S3_BUCKET}`, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(5000),
+      });
+      s3 = res.ok
+        ? { ok: true, detail: `${process.env.S3_BUCKET} @ ${process.env.S3_ENDPOINT}` }
+        : { ok: false, detail: `HTTP ${res.status}` };
+    }
+  } catch (e: any) {
+    s3 = { ok: false, detail: e?.message || "Ошибка" };
+  }
+
+  return { smtp, telegram, s3 };
+}
+
+// ── Impersonation ───────────────────────────────────────────────────────────
+
+export async function impersonateUser(
+  userId: string,
+): Promise<{ ok: boolean; error?: string; token?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    const { SignJWT } = await import("jose");
+    const secret = new TextEncoder().encode(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "");
+    const token = await new SignJWT({ sub: user.id, email: user.email, impersonated: true })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("1h")
+      .sign(secret);
+
+    return { ok: true, token };
+  } catch (e) {
+    recordError(e, "impersonateUser");
+    return { ok: false, error: "Ошибка создания токена" };
+  }
+}
+
+// ── Mass Email ──────────────────────────────────────────────────────────────
+
+export async function sendMassEmail(
+  subject: string,
+  body: string,
+  target: "all" | "participants" | "jury" | "admins",
+): Promise<{ ok: boolean; sent: number; error?: string }> {
+  await requireRole("superadmin");
+
+  if (!process.env.SMTP_HOST) {
+    return { ok: false, sent: 0, error: "SMTP не настроен" };
+  }
+
+  try {
+    const roleFilter = target === "all" ? {} : { role: target };
+    const users = await db.user.findMany({
+      where: roleFilter,
+      select: { email: true },
+    });
+
+    if (users.length === 0) return { ok: false, sent: 0, error: "Нет получателей" };
+
+    const { sendMail } = await import("@/lib/mail");
+    let sent = 0;
+
+    for (const u of users) {
+      try {
+        await sendMail({
+          to: u.email,
+          subject,
+          text: body,
+          html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+            <div style="border-bottom:3px solid #0804ff;padding-bottom:12px;margin-bottom:20px;">
+              <strong style="color:#0804ff;font-size:18px;">Труд Крут</strong>
+            </div>
+            <div style="line-height:1.6;color:#333;">${body.replace(/\n/g, "<br/>")}</div>
+            <div style="margin-top:24px;padding-top:12px;border-top:1px solid #eee;color:#999;font-size:12px;">
+              Национальная премия «Труд крут» · Российские студенческие отряды
+            </div>
+          </div>`,
+        });
+        sent++;
+      } catch {
+        // skip failed
+      }
+    }
+
+    revalidatePath("/admin/super");
+    return { ok: true, sent };
+  } catch (e) {
+    recordError(e, "sendMassEmail");
+    return { ok: false, sent: 0, error: "Ошибка массовой рассылки" };
+  }
+}
 }

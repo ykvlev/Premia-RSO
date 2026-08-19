@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser } from "@/app/admin/super/actions";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -99,6 +99,7 @@ export type SuperData = {
   disk: { totalGB: number; usedGB: number; freeGB: number; pct: number };
   git: { branch: string; commit: string; message: string; author: string; date: string };
   maintenance: { active: boolean; activatedAt: string | null; activatedBy: string | null; reason: string | null };
+  bans: { ip: string; reason: string; bannedBy: string; bannedAt: string }[];
 };
 
 // ─── Токены темы ────────────────────────────────────────────────────────────
@@ -389,6 +390,306 @@ const exportBtn: React.CSSProperties = {
   fontWeight: 600,
   textDecoration: "none",
   display: "inline-block",
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IP Ban Section
+// ═══════════════════════════════════════════════════════════════════════════
+function IpBanSection({ bans }: { bans: { ip: string; reason: string; bannedBy: string; bannedAt: string }[] }) {
+  const [ip, setIp] = useState("");
+  const [reason, setReason] = useState("");
+  const [list, setList] = useState(bans);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const doBan = async () => {
+    if (!ip.trim()) return;
+    setBusy(true);
+    setMsg(null);
+    const { addIpBan } = await import("@/app/admin/super/actions");
+    const res = await addIpBan(ip.trim(), reason.trim());
+    setBusy(false);
+    if (res.ok) {
+      setList([...list, { ip: ip.trim(), reason: reason.trim() || "Banned", bannedBy: "superadmin", bannedAt: new Date().toISOString() }]);
+      setIp(""); setReason(""); setMsg("Заблокирован");
+    } else {
+      setMsg(res.error || "Ошибка");
+    }
+  };
+
+  const doUnban = async (bannedIp: string) => {
+    setBusy(true);
+    const { removeIpBan } = await import("@/app/admin/super/actions");
+    const res = await removeIpBan(bannedIp);
+    setBusy(false);
+    if (res.ok) setList(list.filter((b) => b.ip !== bannedIp));
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+        <input
+          placeholder="IP или CIDR (1.2.3.0/24)"
+          value={ip}
+          onChange={(e) => setIp(e.target.value)}
+          style={{ flex: 1, background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: MONO, fontSize: 13 }}
+        />
+        <input
+          placeholder="Причина..."
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          style={{ flex: 1, background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13 }}
+        />
+        <button
+          onClick={doBan}
+          disabled={busy || !ip.trim()}
+          style={{
+            background: busy || !ip.trim() ? C.card2 : "#ff3b30",
+            color: busy || !ip.trim() ? C.dim : "#fff",
+            border: `1px solid ${busy || !ip.trim() ? C.border : "#ff3b30"}`,
+            borderRadius: 7,
+            padding: "7px 14px",
+            fontSize: 12.5,
+            fontFamily: F,
+            fontWeight: 700,
+            cursor: busy || !ip.trim() ? "default" : "pointer",
+          }}
+        >
+          + Забанить
+        </button>
+      </div>
+      {msg && <p style={{ color: msg.includes("Ошибка") ? C.red : C.green, fontSize: 12, margin: "0 0 8px" }}>{msg}</p>}
+      {list.length === 0 ? (
+        <p style={{ color: C.muted, fontSize: 12.5, fontStyle: "italic" }}>Нет забаненных IP</p>
+      ) : (
+        <Scroll max={220}>
+          {list.map((b) => (
+            <div key={b.ip} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{b.ip}</span>
+                <span style={{ color: C.muted, fontSize: 11, marginLeft: 8 }}>{b.reason}</span>
+              </div>
+              <button
+                onClick={() => doUnban(b.ip)}
+                disabled={busy}
+                style={{ background: "none", color: C.green, border: "none", fontSize: 12, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
+              >
+                Убрать
+              </button>
+            </div>
+          ))}
+        </Scroll>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Integration Test Card
+// ═══════════════════════════════════════════════════════════════════════════
+function IntegrationTestCard() {
+  const [result, setResult] = useState<{ smtp: { ok: boolean; detail: string }; telegram: { ok: boolean; detail: string }; s3: { ok: boolean; detail: string } } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const doTest = async () => {
+    setBusy(true);
+    const { testIntegrations } = await import("@/app/admin/super/actions");
+    const res = await testIntegrations();
+    setResult(res);
+    setBusy(false);
+  };
+
+  const Item = ({ label, ok, detail }: { label: string; ok: boolean; detail: string }) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ width: 10, height: 10, borderRadius: "50%", background: ok ? C.green : "#ff3b30", flexShrink: 0 }} />
+      <div style={{ flex: 1 }}>
+        <span style={{ fontWeight: 600, fontFamily: F, fontSize: 13 }}>{label}</span>
+        <span style={{ color: C.muted, fontSize: 12, marginLeft: 8, fontFamily: MONO }}>{detail}</span>
+      </div>
+      <Badge color={ok ? C.green : "#ff3b30"}>{ok ? "OK" : "FAIL"}</Badge>
+    </div>
+  );
+
+  return (
+    <div>
+      <button
+        onClick={doTest}
+        disabled={busy}
+        style={{
+          ...exportBtn,
+          background: busy ? C.card2 : C.accent,
+          color: busy ? C.dim : "#fff",
+          border: `1px solid ${busy ? C.border : C.accent}`,
+          marginBottom: 12,
+        }}
+      >
+        {busy ? "Проверяю..." : "Проверить все"}
+      </button>
+      {result && (
+        <div>
+          <Item label="SMTP" ok={result.smtp.ok} detail={result.smtp.detail} />
+          <Item label="Telegram" ok={result.telegram.ok} detail={result.telegram.detail} />
+          <Item label="S3 Storage" ok={result.s3.ok} detail={result.s3.detail} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mass Email Card
+// ═══════════════════════════════════════════════════════════════════════════
+function MassEmailCard() {
+  const [target, setTarget] = useState<"all" | "participants" | "jury" | "admins">("all");
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const doSend = async () => {
+    if (!subject.trim() || !body.trim()) return;
+    setBusy(true);
+    setResult(null);
+    const { sendMassEmail } = await import("@/app/admin/super/actions");
+    const res = await sendMassEmail(subject.trim(), body.trim(), target);
+    setBusy(false);
+    setResult(res.ok ? `Отправлено ${res.sent} писем` : res.error || "Ошибка");
+  };
+
+  const targets = [
+    { v: "all", l: "Все" },
+    { v: "participants", l: "Участники" },
+    { v: "jury", l: "Жюри" },
+    { v: "admins", l: "Админы" },
+  ] as const;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {targets.map((t) => (
+          <button
+            key={t.v}
+            onClick={() => setTarget(t.v)}
+            style={{
+              background: target === t.v ? C.accent : C.card2,
+              color: target === t.v ? "#fff" : C.muted,
+              border: `1px solid ${target === t.v ? C.accent : C.border}`,
+              borderRadius: 6,
+              padding: "4px 10px",
+              fontSize: 11.5,
+              fontFamily: F,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            {t.l}
+          </button>
+        ))}
+      </div>
+      <input
+        placeholder="Тема письма"
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        style={{ width: "100%", background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}
+      />
+      <textarea
+        placeholder="Текст письма..."
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        rows={4}
+        style={{ width: "100%", background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13, marginBottom: 8, resize: "vertical", boxSizing: "border-box" }}
+      />
+      <button
+        onClick={doSend}
+        disabled={busy || !subject.trim() || !body.trim()}
+        style={{
+          ...exportBtn,
+          background: busy || !subject.trim() || !body.trim() ? C.card2 : C.accent,
+          color: busy || !subject.trim() || !body.trim() ? C.dim : "#fff",
+          border: `1px solid ${busy || !subject.trim() || !body.trim() ? C.border : C.accent}`,
+        }}
+      >
+        {busy ? "Отправляю..." : "Отправить"}
+      </button>
+      {result && (
+        <p style={{ color: result.includes("Ошибка") ? C.red : C.green, fontSize: 12, marginTop: 8 }}>{result}</p>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Impersonation Card
+// ═══════════════════════════════════════════════════════════════════════════
+function ImpersonationCard({ users }: { users: { id: string; name: string | null; email: string | null; role: string }[] }) {
+  const [selectedId, setSelectedId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const doImpersonate = async () => {
+    if (!selectedId) return;
+    setBusy(true);
+    setError(null);
+    const { impersonateUser } = await import("@/app/admin/super/actions");
+    const res = await impersonateUser(selectedId);
+    setBusy(false);
+    if (res.ok && res.token) {
+      document.cookie = `authjs.session-token=${res.token}; path=/; max-age=3600`;
+      window.location.href = "/cabinet";
+    } else {
+      setError(res.error || "Ошибка");
+    }
+  };
+
+  return (
+    <div>
+      <p style={{ color: C.muted, fontSize: 12, marginBottom: 10 }}>
+        Выберите пользователя для входа от его лица. Токен действителен 1 час.
+      </p>
+      <div style={{ display: "flex", gap: 8 }}>
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          style={{
+            flex: 1,
+            background: C.card2,
+            border: `1px solid ${C.border}`,
+            borderRadius: 7,
+            padding: "7px 10px",
+            color: C.text,
+            fontFamily: F,
+            fontSize: 13,
+          }}
+        >
+          <option value="">— Выберите —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name || u.email || u.id} ({u.role})
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={doImpersonate}
+          disabled={busy || !selectedId}
+          style={{
+            background: busy || !selectedId ? C.card2 : "#ff9500",
+            color: busy || !selectedId ? C.dim : "#fff",
+            border: `1px solid ${busy || !selectedId ? C.border : "#ff9500"}`,
+            borderRadius: 7,
+            padding: "7px 14px",
+            fontSize: 12.5,
+            fontFamily: F,
+            fontWeight: 700,
+            cursor: busy || !selectedId ? "default" : "pointer",
+          }}
+        >
+          {busy ? "..." : "Войти"}
+        </button>
+      </div>
+      {error && <p style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{error}</p>}
+    </div>
+  );
+}
 };
 
 // ─── Основной дашборд ───────────────────────────────────────────────────────
@@ -1382,7 +1683,38 @@ export function SuperDashboard({ data }: { data: SuperData }) {
             </table>
           </Card>
         </div>
-      </div>
+
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* НОВЫЕ ФИЧИ — Сетка 3 колонки                                       */}
+        {/* ════════════════════════════════════════════════════════════════════ */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+            gap: 16,
+            marginTop: 16,
+          }}
+        >
+          {/* ── IP Ban ──────────────────────────────────────────────────────── */}
+          <Card title="IP Баны">
+            <IpBanSection bans={data.bans} />
+          </Card>
+
+          {/* ── Тест интеграций ─────────────────────────────────────────────── */}
+          <Card title="Интеграции">
+            <IntegrationTestCard />
+          </Card>
+
+          {/* ── Массовая рассылка ──────────────────────────────────────────── */}
+          <Card title="Рассылка">
+            <MassEmailCard />
+          </Card>
+
+          {/* ── Вход от лица ────────────────────────────────────────────────── */}
+          <Card title="Вход от лица">
+            <ImpersonationCard users={data.users} />
+          </Card>
+        </div>
 
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.35}}`}</style>
     </main>
