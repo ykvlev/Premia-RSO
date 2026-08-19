@@ -1,22 +1,39 @@
 "use client";
 
+import { useState } from "react";
+
 const F = "var(--font-onest), sans-serif";
 
 /**
- * VK OAuth кнопка — простой редирект на VK ID authorize.
- * Не требует SDK, работает на любом домене.
+ * VK ID OAuth кнопка — redirect на id.vk.com/auth.
+ * Генерирует state для CSRF, сохраняет в sessionStorage.
  */
 export function VkLoginButton() {
+  const [loading, setLoading] = useState(false);
+
   const appId = process.env.NEXT_PUBLIC_VK_ID_APP_ID;
   const redirectUrl = process.env.NEXT_PUBLIC_VK_REDIRECT_URL;
 
   if (!appId || !redirectUrl) return null;
 
-  const vkAuthUrl = `https://id.vk.com/authorize?v=5.191&client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUrl)}&response_type=code&scope=phone%2Cemail&display=page`;
+  function handleClick() {
+    setLoading(true);
+    const state = crypto.randomUUID();
+    sessionStorage.setItem("vk_oauth_state", state);
+    window.location.href =
+      `https://id.vk.com/auth` +
+      `?client_id=${appId}` +
+      `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
+      `&response_type=code` +
+      `&display=page` +
+      `&state=${state}`;
+  }
 
   return (
-    <a
-      href={vkAuthUrl}
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={loading}
       style={{
         display: "flex",
         alignItems: "center",
@@ -24,17 +41,18 @@ export function VkLoginButton() {
         gap: 10,
         width: "100%",
         padding: "13px 20px",
-        background: "#4680FF",
+        background: loading ? "#3A5DB8" : "#4680FF",
         color: "#fff",
         borderRadius: 12,
         fontSize: 15,
         fontFamily: F,
         fontWeight: 600,
-        textDecoration: "none",
+        border: "none",
+        cursor: loading ? "default" : "pointer",
         transition: "background 0.15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = "#3A6DE0")}
-      onMouseLeave={(e) => (e.currentTarget.style.background = "#4680FF")}
+      onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "#3A6DE0"; }}
+      onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = "#4680FF"; }}
     >
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
         <path
@@ -42,7 +60,7 @@ export function VkLoginButton() {
           fill="white"
         />
       </svg>
-      Войти через VK
-    </a>
+      {loading ? "Перенаправление…" : "Войти через VK"}
+    </button>
   );
 }
