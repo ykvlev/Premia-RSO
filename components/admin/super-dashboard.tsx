@@ -690,7 +690,6 @@ function ImpersonationCard({ users }: { users: { id: string; name: string | null
     </div>
   );
 }
-};
 
 // ─── Основной дашборд ───────────────────────────────────────────────────────
 export function SuperDashboard({ data }: { data: SuperData }) {

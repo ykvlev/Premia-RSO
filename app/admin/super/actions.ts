@@ -284,4 +284,3 @@ export async function sendMassEmail(
     return { ok: false, sent: 0, error: "Ошибка массовой рассылки" };
   }
 }
-}
