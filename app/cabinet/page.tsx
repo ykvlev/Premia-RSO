@@ -302,6 +302,7 @@ export default async function CabinetPage() {
             return (
               <div
                 key={a.id}
+                className="hover-card"
                 style={{
                   background: "var(--cab-surface)",
                   border: "1px solid var(--cab-border)",

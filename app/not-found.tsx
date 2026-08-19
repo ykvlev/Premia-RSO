@@ -1,75 +1,84 @@
 import Link from "next/link";
 
+const F = "var(--font-onest), sans-serif";
+
 export default function NotFound() {
   return (
     <main
       style={{
+        flex: 1,
         minHeight: "100vh",
+        background: "#08080a",
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#08080a",
-        color: "#f2f0ec",
-        fontFamily: "var(--font-onest), system-ui, sans-serif",
+        padding: "40px 20px",
       }}
     >
-      <div style={{ textAlign: "center", padding: 40, maxWidth: 480 }}>
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(680px circle at 50% -10%, rgba(8,4,255,0.08), transparent 60%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div style={{ position: "relative", textAlign: "center", maxWidth: 440 }}>
         <p
           style={{
-            fontSize: 80,
-            fontWeight: 800,
+            fontSize: 120,
+            fontWeight: 900,
+            fontFamily: F,
             color: "#0804ff",
             lineHeight: 1,
             margin: "0 0 8px",
-            fontFamily: "var(--font-heading), system-ui",
+            opacity: 0.15,
           }}
         >
           404
         </p>
         <h1
           style={{
-            fontSize: 22,
-            fontWeight: 700,
-            margin: "0 0 8px",
+            color: "#f2f0ec",
+            fontSize: 28,
+            fontFamily: F,
+            fontWeight: 800,
+            margin: "0 0 12px",
+            marginTop: -30,
           }}
         >
           Страница не найдена
         </h1>
-        <p style={{ color: "#9a9aa4", fontSize: 14, margin: "0 0 24px" }}>
-          Похоже, этой страницы не существует или она была перемещена.
+        <p
+          style={{
+            color: "#9a9aa4",
+            fontSize: 15,
+            fontFamily: F,
+            lineHeight: 1.5,
+            margin: "0 0 28px",
+          }}
+        >
+          Возможно, она была перемещена или ссылка устарела.
         </p>
-        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-          <Link
-            href="/"
-            style={{
-              background: "#0804ff",
-              color: "#fff",
-              border: "none",
-              borderRadius: 999,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            На главную
-          </Link>
-          <Link
-            href="/apply"
-            style={{
-              background: "transparent",
-              color: "#9a9aa4",
-              border: "1px solid #2a2a32",
-              borderRadius: 999,
-              padding: "10px 24px",
-              fontSize: 14,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Подать заявку
-          </Link>
-        </div>
+        <Link
+          href="/"
+          style={{
+            display: "inline-block",
+            background: "#0804ff",
+            color: "#fff",
+            fontSize: 15,
+            fontFamily: F,
+            fontWeight: 600,
+            borderRadius: 999,
+            padding: "14px 28px",
+            textDecoration: "none",
+            transition: "background 0.15s",
+          }}
+        >
+          На главную →
+        </Link>
       </div>
     </main>
   );

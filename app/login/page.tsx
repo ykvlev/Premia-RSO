@@ -44,7 +44,7 @@ export default async function LoginPage() {
         }}
       />
 
-      <div style={{ position: "relative", width: "100%", maxWidth: 400 }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 400 }} className="fade-up">
         {/* назад на сайт */}
         <a
           href="/"

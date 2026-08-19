@@ -6,6 +6,10 @@ import { SentryInit } from "@/components/sentry-init";
 import { YandexMetrika } from "@/components/yandex-metrika";
 import { CookieConsent } from "@/components/cookie-consent";
 import { PwaRegister } from "@/components/pwa-register";
+import { ToastProvider } from "@/components/ui/toast";
+import { ConfirmProvider } from "@/components/ui/confirm-dialog";
+import { ProgressBar } from "@/components/ui/progress-bar";
+import { BackToTop } from "@/components/ui/back-to-top";
 import "./globals.css";
 
 const SITE_URL = "https://премиятрудкрут.рф";
@@ -84,7 +88,13 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <ToastProvider>
+            <ConfirmProvider>
+              <ProgressBar />
+              {children}
+              <BackToTop />
+            </ConfirmProvider>
+          </ToastProvider>
         </ThemeProvider>
         <CookieConsent />
         <PwaRegister />

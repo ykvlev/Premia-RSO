@@ -43,7 +43,7 @@ export default async function RegisterPage() {
         }}
       />
 
-      <div style={{ position: "relative", width: "100%", maxWidth: 440 }}>
+      <div style={{ position: "relative", width: "100%", maxWidth: 440 }} className="fade-up">
         <a
           href="/"
           style={{

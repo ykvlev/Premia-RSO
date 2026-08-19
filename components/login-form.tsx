@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSession, signIn } from "next-auth/react";
+import { PasswordToggle } from "@/components/ui/password-toggle";
 
 /** Куда отправлять после входа — по роли из сессии. */
 const roleHome: Record<string, string> = {
@@ -81,14 +82,11 @@ export function LoginForm() {
 
       <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <span style={labelStyle}>Пароль</span>
-        <input
-          type="password"
-          required
-          autoComplete="current-password"
+        <PasswordToggle
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
-          onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+          onChange={setPassword}
+          autoComplete="current-password"
+          required
           style={inputStyle}
         />
       </label>

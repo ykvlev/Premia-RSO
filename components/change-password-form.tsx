@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { changePassword } from "@/app/account/actions";
+import { PasswordToggle } from "@/components/ui/password-toggle";
 
 const F = "var(--font-onest), sans-serif";
 
@@ -95,20 +96,18 @@ export function ChangePasswordForm() {
         required
         style={inputStyle}
       />
-      <input
-        type="password"
-        placeholder="Новый пароль (минимум 8 символов)"
+      <PasswordToggle
         value={next}
-        onChange={(e) => setNext(e.target.value)}
+        onChange={setNext}
+        placeholder="Новый пароль (минимум 8 символов)"
         autoComplete="new-password"
         required
         style={inputStyle}
       />
-      <input
-        type="password"
-        placeholder="Повторите новый пароль"
+      <PasswordToggle
         value={confirm}
-        onChange={(e) => setConfirm(e.target.value)}
+        onChange={setConfirm}
+        placeholder="Повторите новый пароль"
         autoComplete="new-password"
         required
         style={inputStyle}

@@ -10,6 +10,8 @@ import {
 } from "@/app/register/actions";
 
 import { REGIONS } from "@/lib/regions";
+import { PasswordToggle } from "@/components/ui/password-toggle";
+import { useToast } from "@/components/ui/toast";
 
 const F = "var(--font-onest), sans-serif";
 
@@ -136,6 +138,7 @@ function StepIndicator({ current }: { current: Step }) {
 
 export function RegisterForm() {
   const router = useRouter();
+  const { toast } = useToast();
   const [step, setStep] = useState<Step>(1);
 
   // Step 1
@@ -289,14 +292,11 @@ export function RegisterForm() {
 
           <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={labelStyle}>Пароль</span>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
+            <PasswordToggle
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+              onChange={setPassword}
+              autoComplete="new-password"
+              required
               style={inputStyle}
               placeholder="Минимум 8 символов"
             />
@@ -304,16 +304,19 @@ export function RegisterForm() {
 
           <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={labelStyle}>Повторите пароль</span>
-            <input
-              type="password"
-              required
-              autoComplete="new-password"
+            <PasswordToggle
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+              onChange={setConfirmPassword}
+              autoComplete="new-password"
+              required
               style={inputStyle}
             />
+            {confirmPassword && password === confirmPassword && (
+              <span style={{ color: "#2fbf6b", fontSize: 12, fontFamily: F, marginTop: -4 }}>✓ Пароли совпадают</span>
+            )}
+            {confirmPassword && password !== confirmPassword && (
+              <span style={{ color: "#ff6b6b", fontSize: 12, fontFamily: F, marginTop: -4 }}>✕ Пароли не совпадают</span>
+            )}
           </label>
         </>
       )}
