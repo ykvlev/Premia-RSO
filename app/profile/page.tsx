@@ -64,13 +64,24 @@ export default async function ProfilePage() {
           margin: "0 auto",
         }}
       >
-        <div style={{ marginBottom: 32 }}>
+        <div style={{ marginBottom: 32, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/brand/hero-wordmark.svg"
             alt="Труд Крут"
             style={{ display: "block", width: 140, height: "auto" }}
           />
+          <a
+            href="/cabinet"
+            style={{
+              color: "#6a6a72",
+              fontSize: 13,
+              fontFamily: F,
+              textDecoration: "none",
+            }}
+          >
+            ← В кабинет
+          </a>
         </div>
 
         <h1

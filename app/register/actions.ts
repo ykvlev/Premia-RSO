@@ -182,8 +182,13 @@ export async function registerUser(params: {
   email: string;
   password: string;
   fio: string;
+  phone?: string;
+  gender?: string;
+  birthDate?: string;
+  city?: string;
+  region?: string;
 }): Promise<{ ok: boolean; error?: string }> {
-  const { token, email: emailRaw, password, fio } = params;
+  const { token, email: emailRaw, password, fio, phone, gender, birthDate, city, region } = params;
   const email = emailRaw.trim().toLowerCase();
 
   // Валидация
@@ -259,6 +264,11 @@ export async function registerUser(params: {
         passwordHash,
         emailVerified: new Date(),
         role: "participant",
+        ...(phone ? { phone: phone.trim() } : {}),
+        ...(gender ? { gender } : {}),
+        ...(birthDate ? { birthDate: new Date(birthDate) } : {}),
+        ...(city ? { city: city.trim() } : {}),
+        ...(region ? { region: region.trim() } : {}),
       },
     });
   } catch (err) {

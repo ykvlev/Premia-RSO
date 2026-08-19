@@ -9,6 +9,8 @@ import {
   registerUser,
 } from "@/app/register/actions";
 
+import { REGIONS } from "@/lib/regions";
+
 const F = "var(--font-onest), sans-serif";
 
 const inputStyle: React.CSSProperties = {
@@ -64,28 +66,98 @@ const btnDisabled: React.CSSProperties = {
   cursor: "default",
 };
 
-type Step = "credentials" | "code" | "profile";
+type Step = 1 | 2 | 3;
+
+const STEPS = [
+  { num: 1, label: "Email" },
+  { num: 2, label: "Код" },
+  { num: 3, label: "Данные" },
+];
+
+function StepIndicator({ current }: { current: Step }) {
+  return (
+    <div style={{ display: "flex", gap: 8, marginBottom: 24, position: "relative" }}>
+      {STEPS.map((s, i) => {
+        const isActive = s.num === current;
+        const isDone = s.num < current;
+        return (
+          <div key={s.num} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 13,
+                fontFamily: F,
+                fontWeight: 600,
+                transition: "all 0.2s",
+                background: isDone ? "#2fbf6b" : isActive ? "#0804ff" : "#1a1a24",
+                color: isDone || isActive ? "#fff" : "#6a6a72",
+                border: isActive ? "2px solid #0804ff" : isDone ? "2px solid #2fbf6b" : "2px solid #2a2a32",
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
+              {isDone ? "✓" : s.num}
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                fontFamily: F,
+                fontWeight: 500,
+                color: isActive ? "#f2f0ec" : "#6a6a72",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+              }}
+            >
+              {s.label}
+            </span>
+          </div>
+        );
+      })}
+      {/* Connector lines */}
+      <div
+        style={{
+          position: "absolute",
+          top: 15,
+          left: "calc(50% / 3 + 16px)",
+          right: "calc(50% / 3 + 16px)",
+          height: 2,
+          background: current > 1 ? "#2fbf6b" : "#2a2a32",
+          zIndex: 0,
+        }}
+      />
+    </div>
+  );
+}
 
 export function RegisterForm() {
   const router = useRouter();
-  const [step, setStep] = useState<Step>("credentials");
+  const [step, setStep] = useState<Step>(1);
 
-  // Credentials
+  // Step 1
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Code
+  // Step 2
   const [code, setCode] = useState("");
   const [verificationToken, setVerificationToken] = useState("");
 
-  // Profile
+  // Step 3 — profile
   const [fio, setFio] = useState("");
+  const [phone, setPhone] = useState("");
+  const [gender, setGender] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [city, setCity] = useState("");
+  const [region, setRegion] = useState("");
 
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
-  // ── Step 1: Email + password → send code ───────────────────────────────
   async function handleSendCode(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -96,7 +168,6 @@ export function RegisterForm() {
       setPending(false);
       return;
     }
-
     if (password.length < 8) {
       setError("Пароль должен содержать минимум 8 символов");
       setPending(false);
@@ -110,11 +181,10 @@ export function RegisterForm() {
       return;
     }
 
-    setStep("code");
+    setStep(2);
     setPending(false);
   }
 
-  // ── Step 2: Verify code → get token ───────────────────────────────────
   async function handleVerifyCode(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -134,11 +204,10 @@ export function RegisterForm() {
     }
 
     setVerificationToken(res.token);
-    setStep("profile");
+    setStep(3);
     setPending(false);
   }
 
-  // ── Step 3: FIO → register → auto-login ───────────────────────────────
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
@@ -155,6 +224,11 @@ export function RegisterForm() {
       email,
       password,
       fio: fio.trim(),
+      phone: phone || undefined,
+      gender: gender || undefined,
+      birthDate: birthDate || undefined,
+      city: city || undefined,
+      region: region || undefined,
     });
 
     if (!res.ok) {
@@ -163,7 +237,6 @@ export function RegisterForm() {
       return;
     }
 
-    // Автоматический вход после регистрации
     const loginRes = await signIn("credentials", {
       redirect: false,
       email,
@@ -171,43 +244,33 @@ export function RegisterForm() {
     });
 
     if (!loginRes || loginRes.error) {
-      // Регистрация прошла, но вход не удался — отправляем на логин
       router.push("/login");
       return;
     }
 
-    router.push("/profile");
+    router.push("/cabinet");
     router.refresh();
   }
 
-  // ── Resend code ───────────────────────────────────────────────────────
   async function handleResend() {
     setPending(true);
     setError(null);
     const res = await sendVerificationCode(email);
     if (!res.ok) {
       setError(res.error || "Ошибка");
-    } else {
-      setError(null);
-      alert("Новый код отправлен на " + email);
     }
     setPending(false);
   }
 
-  // ── Render ────────────────────────────────────────────────────────────
   return (
     <form
-      onSubmit={
-        step === "credentials"
-          ? handleSendCode
-          : step === "code"
-            ? handleVerifyCode
-            : handleRegister
-      }
+      onSubmit={step === 1 ? handleSendCode : step === 2 ? handleVerifyCode : handleRegister}
       style={{ display: "flex", flexDirection: "column", gap: 18 }}
     >
+      <StepIndicator current={step} />
+
       {/* ── Step 1: Email + password ── */}
-      {step === "credentials" && (
+      {step === 1 && (
         <>
           <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <span style={labelStyle}>Email</span>
@@ -255,18 +318,10 @@ export function RegisterForm() {
         </>
       )}
 
-      {/* ── Step 2: Verification code ── */}
-      {step === "code" && (
+      {/* ── Step 2: Code ── */}
+      {step === 2 && (
         <>
-          <p
-            style={{
-              color: "#c8c8d0",
-              fontSize: 14,
-              fontFamily: F,
-              lineHeight: 1.5,
-              marginBottom: 4,
-            }}
-          >
+          <p style={{ color: "#c8c8d0", fontSize: 14, fontFamily: F, lineHeight: 1.5, marginBottom: 4 }}>
             Код подтверждения отправлен на{" "}
             <b style={{ color: "#f2f0ec" }}>{email}</b>
           </p>
@@ -283,13 +338,7 @@ export function RegisterForm() {
               onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
               onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
               onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
-              style={{
-                ...inputStyle,
-                fontSize: 24,
-                letterSpacing: 8,
-                textAlign: "center",
-                fontFamily: "'Courier New', monospace",
-              }}
+              style={{ ...inputStyle, fontSize: 24, letterSpacing: 8, textAlign: "center", fontFamily: "'Courier New', monospace" }}
               placeholder="000000"
             />
           </label>
@@ -298,40 +347,22 @@ export function RegisterForm() {
             type="button"
             onClick={handleResend}
             disabled={pending}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#0804ff",
-              fontSize: 13,
-              fontFamily: F,
-              cursor: "pointer",
-              textDecoration: "underline",
-              padding: 0,
-              alignSelf: "flex-start",
-            }}
+            style={{ background: "none", border: "none", color: "#0804ff", fontSize: 13, fontFamily: F, cursor: "pointer", textDecoration: "underline", padding: 0, alignSelf: "flex-start" }}
           >
             Отправить код повторно
           </button>
         </>
       )}
 
-      {/* ── Step 3: FIO ── */}
-      {step === "profile" && (
+      {/* ── Step 3: Profile ── */}
+      {step === 3 && (
         <>
-          <p
-            style={{
-              color: "#c8c8d0",
-              fontSize: 14,
-              fontFamily: F,
-              lineHeight: 1.5,
-              marginBottom: 4,
-            }}
-          >
-            Почта подтверждена. Осталось ввести ФИО.
+          <p style={{ color: "#c8c8d0", fontSize: 14, fontFamily: F, lineHeight: 1.5, marginBottom: 4 }}>
+            Почта подтверждена. Заполните данные для участия.
           </p>
 
           <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={labelStyle}>ФИО</span>
+            <span style={labelStyle}>ФИО *</span>
             <input
               type="text"
               required
@@ -344,6 +375,82 @@ export function RegisterForm() {
               placeholder="Фамилия Имя Отчество"
             />
           </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <span style={labelStyle}>Телефон</span>
+            <input
+              type="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
+              onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+              style={inputStyle}
+              placeholder="+7 (999) 123-45-67"
+            />
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={labelStyle}>Пол</span>
+              <select
+                value={gender}
+                onChange={(e) => setGender(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+                style={{ ...inputStyle, cursor: "pointer", color: gender ? "#f2f0ec" : "#6a6a72" }}
+              >
+                <option value="">Не указан</option>
+                <option value="Мужской">Мужской</option>
+                <option value="Женский">Женский</option>
+              </select>
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={labelStyle}>Дата рождения</span>
+              <input
+                type="date"
+                autoComplete="bday"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+                style={{ ...inputStyle, colorScheme: "dark" }}
+              />
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={labelStyle}>Город</span>
+              <input
+                type="text"
+                autoComplete="address-level2"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+                style={inputStyle}
+                placeholder="Москва"
+              />
+            </label>
+
+            <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={labelStyle}>Регион</span>
+              <select
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                onFocus={(e) => (e.currentTarget.style.borderColor = "#0804ff")}
+                onBlur={(e) => (e.currentTarget.style.borderColor = "#2a2a32")}
+                style={{ ...inputStyle, cursor: "pointer", color: region ? "#f2f0ec" : "#6a6a72" }}
+              >
+                <option value="">Выберите регион</option>
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </>
       )}
 
@@ -353,18 +460,14 @@ export function RegisterForm() {
         type="submit"
         disabled={pending}
         style={pending ? btnDisabled : btnPrimary}
-        onMouseEnter={(e) => {
-          if (!pending) e.currentTarget.style.background = "#0602cc";
-        }}
-        onMouseLeave={(e) => {
-          if (!pending) e.currentTarget.style.background = "#0804ff";
-        }}
+        onMouseEnter={(e) => { if (!pending) e.currentTarget.style.background = "#0602cc"; }}
+        onMouseLeave={(e) => { if (!pending) e.currentTarget.style.background = "#0804ff"; }}
       >
         {pending
           ? "Обработка…"
-          : step === "credentials"
+          : step === 1
             ? "Получить код →"
-            : step === "code"
+            : step === 2
               ? "Подтвердить код →"
               : "Зарегистрироваться →"}
       </button>

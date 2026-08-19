@@ -144,11 +144,12 @@ function Stepper({ status }: { status: AppStatus }) {
 /** Личный кабинет участника: все его заявки (по email аккаунта). */
 export default async function CabinetPage() {
   const session = await auth();
-  if (!session?.user?.email) redirect("/login");
+  if (!session?.user?.id) redirect("/login");
   const email = session.user.email;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [apps, season]: [any[], { endAt: Date } | null] = await safeDb(
+  const userId = session.user.id;
+
+  const [apps, season, user]: [any[], { endAt: Date } | null, any] = await safeDb(
     async () => {
       const a = await db.application.findMany({
         where: { email },
@@ -156,10 +157,16 @@ export default async function CabinetPage() {
         orderBy: { createdAt: "desc" },
       });
       const s = await db.season.findFirst({ where: { isActive: true }, select: { endAt: true } });
-      return [a, s] as const;
+      const u = await db.user.findUnique({
+        where: { id: userId },
+        select: { fio: true, phone: true, gender: true, birthDate: true, city: true, region: true },
+      });
+      return [a, s, u] as const;
     },
-    [[] as any[], null],
+    [[] as any[], null, null],
   );
+
+  const profileComplete = user && user.fio && user.phone && user.gender && user.birthDate && user.city && user.region;
 
   return (
     <CabinetTheme>
@@ -215,9 +222,49 @@ export default async function CabinetPage() {
             textDecoration: "none",
           }}
         >
-          Заполнить профиль
+          Редактировать профиль
         </a>
       </div>
+
+      {!profileComplete && (
+        <div
+          style={{
+            background: "rgba(249,115,22,0.08)",
+            border: "1px solid rgba(249,115,22,0.2)",
+            borderRadius: 12,
+            padding: "14px 18px",
+            marginBottom: 20,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⚠</span>
+          <div style={{ flex: 1 }}>
+            <p style={{ color: "#f2f0ec", fontSize: 14, fontWeight: 600, margin: "0 0 2px" }}>
+              Профиль заполнен не полностью
+            </p>
+            <p style={{ color: "#9a9aa4", fontSize: 13, margin: 0 }}>
+              Заполните все поля, чтобы подавать заявки на премию.
+            </p>
+          </div>
+          <a
+            href="/profile"
+            style={{
+              background: "rgba(249,115,22,0.15)",
+              color: "#f97316",
+              fontSize: 13,
+              fontWeight: 600,
+              borderRadius: 999,
+              padding: "8px 16px",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Заполнить →
+          </a>
+        </div>
+      )}
 
       {apps.length === 0 ? (
         <div
