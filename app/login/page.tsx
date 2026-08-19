@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { LoginForm } from "@/components/login-form";
-import { VkLoginButton } from "@/components/vk-login-button";
 
 export const metadata: Metadata = { title: "Вход" };
 
@@ -168,25 +167,6 @@ export default async function LoginPage() {
           }}
         >
           <LoginForm />
-        </div>
-
-        {/* Divider */}
-        <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "20px 0" }}>
-          <div style={{ flex: 1, height: 1, background: "#2a2a32" }} />
-          <span style={{ color: "#6a6a72", fontSize: 12, fontFamily: F }}>или</span>
-          <div style={{ flex: 1, height: 1, background: "#2a2a32" }} />
-        </div>
-
-        {/* VK Login */}
-        <div
-          style={{
-            background: "#121216",
-            border: "1px solid #2a2a32",
-            borderRadius: 16,
-            padding: "18px 26px",
-          }}
-        >
-          <VkLoginButton />
         </div>
 
         <p
