@@ -4,6 +4,8 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
+import { geoLookup } from "@/lib/geoip";
+import { notifyAdminLogin, notifyFailedLogin } from "@/lib/telegram-notify";
 import type { Role } from "@/lib/generated/prisma/client";
 
 /**
@@ -23,9 +25,9 @@ const vkSignInSchema = z.object({
 });
 
 // Антибрутфорс входа (in-memory, на инстанс; сбрасывается при рестарте).
-const LOGIN_MAX_PER_IP = 20; // попыток с одного IP
-const LOGIN_MAX_PER_EMAIL = 8; // попыток на один email
-const LOGIN_WINDOW_MS = 10 * 60_000; // за 10 минут
+const LOGIN_MAX_PER_IP = 5; // попыток с одного IP
+const LOGIN_MAX_PER_EMAIL = 5; // попыток на один email
+const LOGIN_WINDOW_MS = 15 * 60_000; // за 15 минут
 
 /** Dev-пользователи (когда БД недоступна — локальная разработка). */
 const DEV_USERS: Record<string, { id: string; fio: string; role: Role; hash: string }> = {
@@ -74,18 +76,27 @@ function clientIp(req?: Request): string | null {
   );
 }
 
-/** Запись попытки входа в журнал. Никогда не бросает — логирование не должно ломать вход. */
+/** Запись попытки входа в журнал + GeoIP + Telegram-уведомления. */
 async function logLogin(data: {
   email: string;
   success: boolean;
   reason?: string;
   userId?: string;
   role?: string;
+  fio?: string;
   req?: Request;
 }) {
   try {
     const ip = clientIp(data.req);
     const userAgent = data.req?.headers?.get("user-agent")?.slice(0, 300) || null;
+
+    // GeoIP lookup
+    let geo: { country: string; city: string } | null = null;
+    if (ip) {
+      geo = await geoLookup(ip);
+    }
+
+    // Запись в БД
     await db.loginEvent.create({
       data: {
         email: data.email.slice(0, 200),
@@ -95,8 +106,38 @@ async function logLogin(data: {
         role: data.role ?? null,
         ip,
         userAgent,
+        geoCountry: geo?.country ?? null,
+        geoCity: geo?.city ?? null,
       },
     });
+
+    // Telegram-уведомления для админов
+    if (data.role && ["admin", "superadmin"].includes(data.role)) {
+      if (data.success) {
+        // Проверяем — первый вход с этого IP?
+        const prevLogins = await db.loginEvent.count({
+          where: {
+            userId: data.userId!,
+            success: true,
+            ip: ip!,
+            NOT: { id: undefined },
+          },
+        });
+        const isNewDevice = prevLogins <= 1;
+
+        notifyAdminLogin({
+          email: data.email,
+          fio: data.fio ?? data.email,
+          role: data.role,
+          ip,
+          geo,
+          userAgent,
+          isNewDevice,
+        });
+      } else if (data.reason && data.reason !== "rate_limited") {
+        notifyFailedLogin({ email: data.email, ip, reason: data.reason, geo });
+      }
+    }
   } catch {
     /* журнал не критичен для входа */
   }
@@ -151,11 +192,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await compare(password, user.passwordHash);
         if (!valid) {
-          await logLogin({ email, success: false, reason: "bad_password", userId: user.id, role: user.role, req });
+          await logLogin({ email: user.email, success: false, reason: "bad_password", userId: user.id, role: user.role, fio: user.fio, req });
           return null;
         }
 
-        await logLogin({ email: user.email, success: true, userId: user.id, role: user.role, req });
+        await logLogin({ email: user.email, success: true, userId: user.id, role: user.role, fio: user.fio, req });
         return { id: user.id, email: user.email, name: user.fio, role: user.role };
       },
     }),
@@ -208,7 +249,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
         }
 
-        await logLogin({ email: user.email, success: true, userId: user.id, role: user.role });
+        await logLogin({ email: user.email, success: true, userId: user.id, role: user.role, fio: user.fio });
         return { id: user.id, email: user.email, name: user.fio, role: user.role };
       },
     }),

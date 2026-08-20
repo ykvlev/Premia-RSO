@@ -136,6 +136,8 @@ model LoginEvent {
   reason    String? // почему отказано: no_user / bad_password / bad_input
   ip        String?
   userAgent String?
+  geoCountry String?
+  geoCity    String?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
