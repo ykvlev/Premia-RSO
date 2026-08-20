@@ -3935,6 +3935,9 @@ function Sidebar({
       <a href="/admin/mailing" style={itemStyle(false)}>
         <PaperPlaneTilt size={16} /> Рассылка
       </a>
+      <a href="/admin/management" style={itemStyle(false)}>
+        <ListChecks size={16} /> Управление
+      </a>
 
       <div style={{ flex: 1 }} />
 
