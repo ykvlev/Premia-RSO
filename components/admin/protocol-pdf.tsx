@@ -259,7 +259,7 @@ function ProtocolDocument({ app }: { app: Application }) {
 
         {/* Expert comment */}
         <View>
-          <Text style={styles.sectionTitle}>Заключение эксперта</Text>
+          <Text style={styles.sectionTitle}>Заключение оргкомитета</Text>
           <View style={styles.commentBox}>
             <Text style={styles.commentText}>
               {app.expertComment || "Комментарий не указан."}
@@ -270,7 +270,7 @@ function ProtocolDocument({ app }: { app: Application }) {
         {/* Signatures */}
         <View style={styles.signatureLine}>
           <View style={styles.signatureBox}>
-            <Text style={styles.signatureLabel}>Эксперт</Text>
+            <Text style={styles.signatureLabel}>Член оргкомитета</Text>
           </View>
           <View style={styles.signatureBox}>
             <Text style={styles.signatureLabel}>Председатель комиссии</Text>

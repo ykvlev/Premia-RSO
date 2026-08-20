@@ -347,12 +347,12 @@ const SAMPLE: Application[] = [
       { ts: "2026-07-11T09:41:00", user: "Система", action: "Заявка создана" },
       {
         ts: "2026-07-12T11:20:00",
-        user: "Эксперт Комиссии №1",
+        user: "Член оргкомитета",
         action: "Статус → На рассмотрении",
       },
       {
         ts: "2026-07-13T16:05:00",
-        user: "Эксперт Комиссии №1",
+        user: "Член оргкомитета",
         action: "Выставлены баллы: 87/100",
       },
       {
@@ -434,7 +434,7 @@ const SAMPLE: Application[] = [
       { ts: "2026-07-13T11:30:00", user: "Система", action: "Заявка создана" },
       {
         ts: "2026-07-14T14:00:00",
-        user: "Эксперт Комиссии №2",
+        user: "Член оргкомитета",
         action: "Выставлены баллы: 31/100",
       },
       {
@@ -485,7 +485,7 @@ const SAMPLE: Application[] = [
       { ts: "2026-07-14T08:15:00", user: "Система", action: "Заявка создана" },
       {
         ts: "2026-07-15T10:00:00",
-        user: "Эксперт Комиссии №1",
+        user: "Член оргкомитета",
         action: "Выставлены баллы: 96/100",
       },
       {
@@ -572,7 +572,7 @@ const SAMPLE: Application[] = [
       { ts: "2026-07-16T10:30:00", user: "Система", action: "Заявка создана" },
       {
         ts: "2026-07-17T11:00:00",
-        user: "Эксперт Комиссии №2",
+        user: "Член оргкомитета",
         action: "Выставлены баллы: 79/100",
       },
       {
@@ -648,7 +648,7 @@ const SAMPLE: Application[] = [
       { ts: "2026-07-18T14:50:00", user: "Система", action: "Заявка создана" },
       {
         ts: "2026-07-19T08:30:00",
-        user: "Эксперт Комиссии №1",
+        user: "Член оргкомитета",
         action: "Статус → На рассмотрении",
       },
     ],
@@ -925,7 +925,7 @@ export interface AdminUser {
   username: string;
   password: string;
   displayName: string;
-  role: "superadmin" | "expert" | "viewer";
+  role: "superadmin" | "admin" | "viewer";
 }
 
 const USERS: AdminUser[] = [
@@ -938,14 +938,14 @@ const USERS: AdminUser[] = [
   {
     username: "expert1",
     password: "Expert#001",
-    displayName: "Эксперт Комиссии №1",
-    role: "expert",
+    displayName: "Оргкомитет",
+    role: "admin",
   },
   {
     username: "expert2",
     password: "Expert#002",
-    displayName: "Эксперт Комиссии №2",
-    role: "expert",
+    displayName: "Оргкомитет",
+    role: "admin",
   },
   {
     username: "viewer",
@@ -957,7 +957,7 @@ const USERS: AdminUser[] = [
 
 const ROLE_META: Record<AdminUser["role"], { label: string; color: string }> = {
   superadmin: { label: "Суперадмин", color: "#0804ff" },
-  expert: { label: "Эксперт", color: "#f59e0b" },
+  admin: { label: "Оргкомитет", color: "#f59e0b" },
   viewer: { label: "Наблюдатель", color: "#6a6a72" },
 };
 
@@ -1839,7 +1839,7 @@ function DetailView({
               padding: "20px 20px",
             }}
           >
-            <SectionHd icon={<ChatText size={14} />} title="Комментарий эксперта" />
+            <SectionHd icon={<ChatText size={14} />} title="Комментарий оргкомитета" />
             <textarea
               value={local.expertComment}
               readOnly={!canEdit}
@@ -3070,7 +3070,7 @@ function ListView({
         {[
           { lb: "Всего заявок", vl: apps.length, sub: "в сезоне", acc: true },
           { lb: "Новых", vl: apps.filter((a) => a.status === "new").length, sub: "требуют разбора" },
-          { lb: "На оценке жюри", vl: apps.filter((a) => a.status === "scoring").length, sub: "у экспертов" },
+          { lb: "На оценке жюри", vl: apps.filter((a) => a.status === "scoring").length, sub: "у жюри" },
           { lb: "Победителей", vl: apps.filter((a) => a.status === "winner").length, sub: "определены" },
         ].map((k) => (
           <div

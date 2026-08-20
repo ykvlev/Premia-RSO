@@ -10,7 +10,6 @@ const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 const ROLE: Record<string, { label: string; color: string }> = {
   superadmin: { label: "Суперадмин", color: "#2b4cff" },
   admin: { label: "Оргкомитет", color: "#5b8def" },
-  expert: { label: "Эксперт", color: "#8a5cf6" },
 };
 
 type Ico = (p: { s?: number }) => React.ReactElement;
@@ -154,6 +153,7 @@ export function AdminSidebar({
       <Link href="/admin" style={st(active.list)}><IcList /> Заявки {badge(appsCount, active.list)}</Link>
       <Link href="/admin?view=compare" style={st(active.compare)}><IcCompare /> Сравнение</Link>
       <Link href="/admin?view=dashboard" style={st(active.dashboard)}><IcDash /> Дашборд</Link>
+      <Link href="/admin/management" style={st(pathname.startsWith("/admin/management"))}><IcDoc /> Управление</Link>
 
       {label("Оценка")}
       <Link href="/admin/jury" style={st(active.jury)}><IcJury /> Жюри</Link>

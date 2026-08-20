@@ -123,7 +123,7 @@ export default async function AdminPage() {
     username: session.user.email ?? "",
     password: "",
     displayName: session.user.name ?? "Администратор",
-    role: session.user.role === "superadmin" ? "superadmin" : "expert",
+    role: session.user.role === "superadmin" ? "superadmin" : "admin",
   };
 
   return <AdminApp initialApps={initialApps} currentUser={currentUser} />;
