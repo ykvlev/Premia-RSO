@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
 import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData } from "@/app/admin/super/actions";
+import { DatabaseSchemaViewer } from "@/components/admin/db-schema-viewer";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -2344,6 +2345,11 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* ── Database Health ─────────────────────────────────────────────── */}
           <Card title="Здоровье БД">
             <DbHealthCard dbHealth={data.dbHealth} />
+          </Card>
+
+          {/* ── DB Schema Visual ──────────────────────────────────────────── */}
+          <Card title="Структура БД · ERD" span={2}>
+            <DatabaseSchemaViewer tables={data.dbHealth?.tables} />
           </Card>
         </div>
       </div>
