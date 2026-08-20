@@ -957,7 +957,7 @@ const USERS: AdminUser[] = [
 
 const ROLE_META: Record<AdminUser["role"], { label: string; color: string }> = {
   superadmin: { label: "Суперадмин", color: "#0804ff" },
-  admin: { label: "Оргкомитет", color: "#f59e0b" },
+  admin: { label: "Оргкомитет", color: "#5b8def" },
   viewer: { label: "Наблюдатель", color: "#6a6a72" },
 };
 

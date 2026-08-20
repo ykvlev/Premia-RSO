@@ -406,6 +406,13 @@ export default async function SuperPage() {
       count: Number(r.n),
     }));
 
+    // Admin profiles
+    const adminProfiles = await db.user.findMany({
+      where: { role: { in: ["admin", "superadmin"] } },
+      select: { id: true, fio: true, email: true, phone: true, role: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+
     data.disk = disk;
     data.git = git;
     data.maintenance = maintenance;
@@ -414,6 +421,7 @@ export default async function SuperPage() {
     data.auditLogs = auditLogs;
     data.dbHealth = dbHealth;
     data.regPerDay = regPerDay;
+    data.adminProfiles = adminProfiles.map((p) => ({ ...p, createdAt: p.createdAt.toISOString() }));
   } catch {
     // БД недоступна — пустой дашборд
     const perf = getPerfStats(30);
@@ -465,6 +473,7 @@ export default async function SuperPage() {
       auditLogs: [],
       dbHealth: { tables: [], totalSize: "—" },
       regPerDay: [],
+      adminProfiles: [],
     };
   }
 

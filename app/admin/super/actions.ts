@@ -584,3 +584,118 @@ export async function getBlockedSessionList() {
   await requireRole("superadmin");
   return getBlockedSessions();
 }
+
+// ── Admin Profiles CRUD ──────────────────────────────────────────────────
+
+export async function getAdminProfiles() {
+  await requireRole("superadmin");
+  const users = await db.user.findMany({
+    where: { role: { in: ["admin", "superadmin"] } },
+    select: { id: true, fio: true, email: true, phone: true, role: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return users;
+}
+
+export async function createAdminProfile(
+  fio: string,
+  email: string,
+  password: string,
+  role: "admin" | "superadmin",
+  phone?: string,
+): Promise<{ ok: boolean; error?: string; id?: string }> {
+  await requireRole("superadmin");
+  try {
+    const existing = await db.user.findUnique({ where: { email } });
+    if (existing) return { ok: false, error: "Пользователь с таким email уже существует" };
+
+    const { hash } = await import("bcryptjs");
+    const passwordHash = await hash(password, 12);
+
+    const user = await db.user.create({
+      data: {
+        fio,
+        email,
+        passwordHash,
+        role,
+        phone: phone || null,
+      },
+    });
+
+    logAdminAction("create_admin", user.id, { email, role, fio });
+
+    revalidatePath("/admin/super");
+    return { ok: true, id: user.id };
+  } catch (e) {
+    recordError(e, "createAdminProfile");
+    return { ok: false, error: "Ошибка создания профиля" };
+  }
+}
+
+export async function updateAdminProfile(
+  userId: string,
+  data: { fio?: string; email?: string; phone?: string; role?: "admin" | "superadmin" },
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true } });
+    if (!user) return { ok: false, error: "Пользователь не найден" };
+
+    if (data.email) {
+      const dup = await db.user.findFirst({ where: { email: data.email, NOT: { id: userId } } });
+      if (dup) return { ok: false, error: "Email уже используется" };
+    }
+
+    await db.user.update({ where: { id: userId }, data });
+    logAdminAction("update_admin", userId, data);
+    revalidatePath("/admin/super");
+    return { ok: true };
+  } catch (e) {
+    recordError(e, "updateAdminProfile");
+    return { ok: false, error: "Ошибка обновления" };
+  }
+}
+
+export async function deleteAdminProfile(
+  userId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найден" };
+    if (user.role === "superadmin") {
+      const count = await db.user.count({ where: { role: "superadmin" } });
+      if (count <= 1) return { ok: false, error: "Нельзя удалить последнего суперадмина" };
+    }
+
+    await db.user.delete({ where: { id: userId } });
+    logAdminAction("delete_admin", userId, { email: user.email });
+    revalidatePath("/admin/super");
+    return { ok: true };
+  } catch (e) {
+    recordError(e, "deleteAdminProfile");
+    return { ok: false, error: "Ошибка удаления" };
+  }
+}
+
+export async function resetAdminPassword(
+  userId: string,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найден" };
+
+    const code = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+    const { hash } = await import("bcryptjs");
+    const hashVal = await hash(code, 12);
+
+    await db.user.update({ where: { id: userId }, data: { passwordHash: hashVal } });
+    logAdminAction("reset_admin_password", userId, { email: user.email });
+
+    return { ok: true, code };
+  } catch (e) {
+    recordError(e, "resetAdminPassword");
+    return { ok: false, error: "Ошибка сброса пароля" };
+  }
+}

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
 import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData } from "@/app/admin/super/actions";
 import { FeatureFlagsCard } from "@/components/admin/super/feature-flags-card";
+import { AdminProfilesCard } from "@/components/admin/super/admin-profiles-card";
 import { DatabaseSchemaViewer } from "@/components/admin/db-schema-viewer";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ export type SuperData = {
   auditLogs: { id: string; actor: string; action: string; target: string | null; detail: any; ip: string | null; createdAt: Date }[];
   dbHealth: { tables: { name: string; count: number; size: string }[]; totalSize: string };
   regPerDay: { day: string; count: number }[];
+  adminProfiles: { id: string; fio: string; email: string; phone: string | null; role: string; createdAt: string }[];
 };
 
 // ─── Токены темы ────────────────────────────────────────────────────────────
@@ -2475,6 +2477,11 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* ── DB Backup ─────────────────────────────────────────────────── */}
           <Card title="Бэкап БД">
             <DbBackupCard />
+          </Card>
+
+          {/* ── Admin Profiles ───────────────────────────────────────────── */}
+          <Card title="Профили администраторов">
+            <AdminProfilesCard profiles={data.adminProfiles} />
           </Card>
 
           {/* ── DB Schema Visual ──────────────────────────────────────────── */}

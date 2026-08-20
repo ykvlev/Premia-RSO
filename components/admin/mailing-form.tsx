@@ -16,6 +16,93 @@ const STATUS_OPTS: { value: string; label: string }[] = [
   { value: "rejected", label: "Отклонённые" },
 ];
 
+const EMAIL_PRESETS: { id: string; icon: string; label: string; category: string; subject: string; body: string; defaultTarget: string }[] = [
+  {
+    id: "welcome", icon: "👋", category: "Общее",
+    label: "Приветствие нового участника",
+    subject: "Добро пожаловать в «Труд Крут»!",
+    body: "Здравствуйте, {name}!\n\nРады приветствовать вас на Национальной премии «Труд Крут». Ваша заявка принята и находится на рассмотрении.\n\nМы уведомим вас о дальнейших этапах.\n\nС уважением,\nОргкомитет премии «Труд Крут»",
+    defaultTarget: "new",
+  },
+  {
+    id: "status_change", icon: "📋", category: "Статус заявки",
+    label: "Заявка принята к рассмотрению",
+    subject: "Ваша заявка на «Труд Крут» — статус обновлён",
+    body: "Здравствуйте, {name}!\n\nВаша заявка переведена на этап рассмотрения. Наш оргкомитет уже изучает материалы.\n\nСледите за обновлениями в личном кабинете.\n\nС уважением,\nОргкомитет",
+    defaultTarget: "review",
+  },
+  {
+    id: "revision", icon: "✏️", category: "Статус заявки",
+    label: "Запрос доработки",
+    subject: "«Труд Крут» — доработка заявки",
+    body: "Здравствуйте, {name}!\n\nПо результатам первичного рассмотрения вашей заявки专家组 рекомендует внести доработки. Пожалуйста, обновите материалы в личном кабинете и отправьте повторно.\n\nЕсли вопросы — пишите, мы поможем.\n\nОргкомитет «Труд Крут»",
+    defaultTarget: "review",
+  },
+  {
+    id: "finalist", icon: "🎉", category: "Статус заявки",
+    label: "Поздравление финалиста",
+    subject: "Поздравляем! Вы — финалист премии «Труд Крут»!",
+    body: "Здравствуйте, {name}!\n\nС огромным удовольствием сообщаем, что ваша заявка прошла все этапы отбора и вышли в финал Национальной премии «Труд Крут»!\n\nМы свяжемся с вами для участия в церемонии награждения.\n\nС уважением,\nОргкомитет",
+    defaultTarget: "approved",
+  },
+  {
+    id: "winner", icon: "🏆", category: "Статус заявки",
+    label: "Победитель премии",
+    subject: "Вы — победитель Национальной премии «Труд Крут»!",
+    body: "Здравствуйте, {name}!\n\nМы счастливы сообщить, что вы стали победителем Национальной премии «Труд Крут» в вашей номинации!\n\nПриглашаем вас на торжественную церемонию награждения. Подробности отправим отдельно.\n\nС уважением,\nОргкомитет",
+    defaultTarget: "winner",
+  },
+  {
+    id: "rejected", icon: "📬", category: "Статус заявки",
+    label: "Отклонение заявки",
+    subject: "Результат рассмотрения заявки «Труд Крут»",
+    body: "Здравствуйте, {name}!\n\nБлагодарим за участие в Национальной премии «Труд Крут». К сожалению, на данном этапе ваша заявка не прошла отбор.\n\nМы ценим ваш вклад и будем рады видеть вас снова в следующем сезоне.\n\nС уважением,\nОргкомитет",
+    defaultTarget: "rejected",
+  },
+  {
+    id: "ceremony_invite", icon: "🎭", category: "Мероприятия",
+    label: "Приглашение на церемонию",
+    subject: "Приглашение на церемонию награждения «Труд Крут»",
+    body: "Здравствуйте, {name}!\n\nПриглашаем вас на торжественную церемонию награждения Национальной премии «Труд Крут».\n\n📅 Дата: [указать дату]\n📍 Место: [указать место]\n🕐 Начало: [указать время]\n\nПросим подтвердить присутствие до [дата].\n\nС уважением,\nОргкомитет",
+    defaultTarget: "approved",
+  },
+  {
+    id: "deadline_reminder", icon: "⏰", category: "Напоминания",
+    label: "Напоминание о дедлайне",
+    subject: "«Труд Крут» — осталось мало времени!",
+    body: "Здравствуйте, {name}!\n\nНапоминаем, что срок подачи заявок на Национальную премию «Труд Крут» истекает [дата].\n\nУспейте отправить свою заявку в личном кабинете.\n\nУдачи!\nОргкомитет",
+    defaultTarget: "new",
+  },
+  {
+    id: "jury_invite", icon: "⚖️", category: "Жюри",
+    label: "Приглашение жюри",
+    subject: "Приглашение в жюри Национальной премии «Труд Крут»",
+    body: "Здравствуйте, {name}!\n\nПриглашаем вас стать членом жюри Национальной премии «Труд Крут» в сезоне [год].\n\nВаш экспертный опыт будет неоценим для оценки заявок. Ознакомьтесь с критериями в личном кабинете.\n\nБудем рады сотрудничеству!\nОргкомитет",
+    defaultTarget: "all",
+  },
+  {
+    id: "season_start", icon: "🚀", category: "Общее",
+    label: "Старт нового сезона",
+    subject: "Новый сезон «Труд Крут» открыт!",
+    body: "Здравствуйте, {name}!\n\nМы рады объявить о старте нового сезона Национальной премии «Труд Крут»!\n\nПодавайте заявки, участвуйте в оценке и присоединяйтесь к нашему сообществу профессионалов.\n\nПодробности на сайте.\n\nОргкомитет",
+    defaultTarget: "all",
+  },
+  {
+    id: "results_published", icon: "📊", category: "Общее",
+    label: "Публикация результатов",
+    subject: "Результаты «Труд Крут» — [год] объявлены!",
+    body: "Здравствуйте, {name}!\n\nРезультаты Национальной премии «Труд Крут» [год] подведены.\n\nПобедители и финалисты получат персональные уведомления. Полный список доступен на сайте премии.\n\nБлагодарим всех участников!\nОргкомитет",
+    defaultTarget: "all",
+  },
+  {
+    id: "profile_reminder", icon: "👤", category: "Напоминания",
+    label: "Заполните профиль",
+    subject: "«Труд Крут» — заполните профиль участника",
+    body: "Здравствуйте, {name}!\n\nДля участия в премии «Труд Крут» необходимо заполнить профиль участника в личном кабинете.\n\nУкажите рабочие данные и информацию о себе — это поможет жюри при оценке заявки.\n\nОргкомитет",
+    defaultTarget: "all",
+  },
+];
+
 const inputStyle: React.CSSProperties = {
   width: "100%",
   background: "#0d0d12",
@@ -50,6 +137,18 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
   >(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState(false);
+  const [showPresets, setShowPresets] = useState(true);
+  const [catFilter, setCatFilter] = useState("all");
+
+  const categories = [...new Set(EMAIL_PRESETS.map((p) => p.category))];
+  const filteredPresets = catFilter === "all" ? EMAIL_PRESETS : EMAIL_PRESETS.filter((p) => p.category === catFilter);
+
+  function applyPreset(preset: typeof EMAIL_PRESETS[0]) {
+    setSubject(preset.subject);
+    setBody(preset.body);
+    setStatus(preset.defaultTarget);
+    setShowPresets(false);
+  }
 
   async function onPreview() {
     if (!body.trim()) {
@@ -100,6 +199,36 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
 
   return (
     <div style={{ maxWidth: 640 }}>
+      {/* ── Email Template Presets ──────────────────────────────────────── */}
+      <div style={{ marginBottom: 20, padding: 14, borderRadius: 10, background: "#0d0d12", border: "1px solid #1d1d25" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showPresets ? 12 : 0 }}>
+          <span style={{ color: "#f2f0ec", fontSize: 13, fontWeight: 700, fontFamily: F }}>Шаблоны писем</span>
+          <button onClick={() => setShowPresets(!showPresets)} style={{ background: "transparent", border: "none", color: "#9a9aa4", fontSize: 12, cursor: "pointer", fontFamily: F }}>
+            {showPresets ? "Свернуть" : "Показать"}
+          </button>
+        </div>
+        {showPresets && (
+          <>
+            <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+              <button onClick={() => setCatFilter("all")} style={{ padding: "4px 10px", borderRadius: 5, background: catFilter === "all" ? "#0804ff20" : "transparent", border: `1px solid ${catFilter === "all" ? "#0804ff" : "#2a2a32"}`, color: catFilter === "all" ? "#c9d1ff" : "#6a6a72", fontSize: 11, cursor: "pointer", fontFamily: F }}>Все</button>
+              {categories.map((c) => (
+                <button key={c} onClick={() => setCatFilter(c)} style={{ padding: "4px 10px", borderRadius: 5, background: catFilter === c ? "#0804ff20" : "transparent", border: `1px solid ${catFilter === c ? "#0804ff" : "#2a2a32"}`, color: catFilter === c ? "#c9d1ff" : "#6a6a72", fontSize: 11, cursor: "pointer", fontFamily: F }}>{c}</button>
+              ))}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: 8 }}>
+              {filteredPresets.map((p) => (
+                <button key={p.id} onClick={() => applyPreset(p)} style={{ textAlign: "left", padding: "10px 12px", borderRadius: 8, background: "#111117", border: "1px solid #1d1d25", cursor: "pointer", transition: "border-color 0.15s", fontFamily: F }}
+                  onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#0804ff55")}
+                  onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1d1d25")}>
+                  <span style={{ fontSize: 16 }}>{p.icon}</span>
+                  <p style={{ color: "#f2f0ec", fontSize: 12, fontWeight: 600, margin: "6px 0 2px", lineHeight: 1.3 }}>{p.label}</p>
+                  <p style={{ color: "#6a6a72", fontSize: 10, margin: 0 }}>{p.category}</p>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <div>
           <label style={labelStyle}>Кому</label>
