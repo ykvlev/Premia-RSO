@@ -70,6 +70,7 @@ export function ManagementPanel({
   const [msg, setMsg] = useState<string | null>(null);
   const [templates, setTemplates] = useState(initTemplates);
   const [newTpl, setNewTpl] = useState({ name: "", subject: "", body: "", category: "general" });
+  const [exporting, setExporting] = useState(false);
 
   const flash = (t: string) => { setMsg(t); setTimeout(() => setMsg(null), 4000); };
 
@@ -106,13 +107,19 @@ export function ManagementPanel({
   };
 
   const doExport = async () => {
+    setExporting(true);
     const { exportApplicationsToExcel } = await import("@/app/admin/management/actions");
     const r = await exportApplicationsToExcel({ status: stF, nominationId: nomF, region: regF });
-    if (r.csv) {
-      const blob = new Blob(["\uFEFF" + r.csv], { type: "text/csv;charset=utf-8" });
+    setExporting(false);
+    if (r.ok && r.base64) {
+      const binary = atob(r.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = "apps-" + new Date().toISOString().slice(0, 10) + ".csv"; a.click();
+      const a = document.createElement("a"); a.href = url; a.download = r.filename; a.click();
       URL.revokeObjectURL(url);
+      flash("Экспортировано " + r.count + " заявок");
     }
   };
 
@@ -161,7 +168,9 @@ export function ManagementPanel({
               <option value="all">Все регионы</option>
               {regions.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
-            <button onClick={doExport} style={{ ...btn(C.card2, C.muted), border: "1px solid " + C.border }}>Экспорт CSV</button>
+            <button onClick={doExport} style={{ ...btn(C.card2, C.muted), border: "1px solid " + C.border }}>
+              {exporting ? "Экспортирую..." : "Экспорт XLSX"}
+            </button>
           </div>
 
           {sel.size > 0 && (

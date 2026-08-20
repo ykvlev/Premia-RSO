@@ -142,6 +142,7 @@ export async function exportApplicationsToExcel(filters: {
   region?: string;
 }) {
   await requireRole("admin", "superadmin");
+  const ExcelJS = await import("exceljs");
 
   const where: any = {};
   if (filters.status && filters.status !== "all") where.status = filters.status;
@@ -152,24 +153,177 @@ export async function exportApplicationsToExcel(filters: {
     where,
     orderBy: { createdAt: "desc" },
     include: {
-      nomination: { select: { title: true } },
-      evaluations: { select: { scores: true } },
+      nomination: { select: { id: true, title: true, criteria: true } },
+      evaluations: { select: { scores: true, juryUserId: true } },
     },
   });
 
-  const header = "ID,Организация,ФИО,Email,Телефон,Регион,Статус,Номинация,ИНН,Средний балл,Кол-во оценок,Место работы,Должность,Дата подачи";
-  const rows = apps.map((a: any) => {
+  const STATUS_COLORS: Record<string, string> = {
+    new: "5B8DEF", queued: "9A9AA4", review: "F5A623", revision: "E0703A",
+    scoring: "8A5CF6", finalist: "2FBF6B", winner: "F5C518", rejected: "FF6B6B",
+  };
+
+  const wb = new ExcelJS.default.Workbook();
+  wb.creator = "Труд Крут · Админка";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("Заявки", {
+    views: [{ state: "frozen", ySplit: 2 }],
+  });
+
+  // ── Title row ──────────────────────────────────────────────────────────
+  ws.mergeCells("A1:R1");
+  const titleCell = ws.getCell("A1");
+  titleCell.value = `Национальная премия «Труд Крут» — Заявки (${apps.length} шт.)`;
+  titleCell.font = { name: "Calibri", size: 14, bold: true, color: { argb: "FF0804FF" } };
+  titleCell.alignment = { vertical: "middle", horizontal: "left" };
+  titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF2F0EC" } };
+  ws.getRow(1).height = 32;
+
+  // ── Column definitions ─────────────────────────────────────────────────
+  const columns = [
+    { header: "№", key: "num", width: 5 },
+    { header: "Организация", key: "orgName", width: 28 },
+    { header: "ФИО номинанта", key: "fio", width: 24 },
+    { header: "Email", key: "email", width: 28 },
+    { header: "Телефон", key: "phone", width: 16 },
+    { header: "Регион", key: "region", width: 20 },
+    { header: "ИНН", key: "inn", width: 14 },
+    { header: "Номинация", key: "nomination", width: 32 },
+    { header: "Статус", key: "status", width: 20 },
+    { header: "Средний балл", key: "avgScore", width: 13 },
+    { header: "Оценок", key: "evalCount", width: 9 },
+    { header: "Место работы", key: "workplace", width: 28 },
+    { header: "Должность", key: "position", width: 22 },
+    { header: "Дата подачи", key: "createdAt", width: 14 },
+  ];
+
+  // Add criteria columns from first nomination
+  const firstNom = apps[0]?.nomination;
+  const critDefs = ((firstNom?.criteria ?? []) as { label: string; maxScore?: number }[]) || [];
+  for (const c of critDefs) {
+    columns.push({ header: c.label, key: `crit_${c.label}`, width: Math.max(14, c.label.length + 4) });
+  }
+
+  ws.columns = columns;
+
+  // ── Header row styling (row 2) ─────────────────────────────────────────
+  const headerRow = ws.getRow(2);
+  headerRow.height = 24;
+  headerRow.eachCell((cell, colNumber) => {
+    cell.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0804FF" } };
+    cell.alignment = { vertical: "middle", horizontal: "center", wrapText: false };
+    cell.border = {
+      bottom: { style: "medium" as const, color: { argb: "FF0603CC" } },
+    };
+  });
+
+  // ── Data rows ──────────────────────────────────────────────────────────
+  apps.forEach((a, idx) => {
     const p = (a.payload ?? {}) as Record<string, unknown>;
     const str = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "");
     const totals = a.evaluations.map((e: any) => {
       const s = (e.scores ?? {}) as Record<string, number>;
       return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
     });
-    const avgScore = totals.length > 0 ? Math.round(totals.reduce((s: number, t: number) => s + t, 0) / totals.length) : "";
-    return `"${a.id}","${a.orgName}","${a.contactFio}","${a.email}","${a.phone}","${a.region}","${STATUS_LABEL_RU[a.status as AppStatus] ?? a.status}","${a.nomination.title}","${a.inn}","${avgScore}","${a.evaluations.length}","${str("workplace")}","${str("position")}","${a.createdAt.toISOString().slice(0, 10)}"`;
+    const avgScore = totals.length > 0 ? Math.round(totals.reduce((s: number, t: number) => s + t, 0) / totals.length) : null;
+
+    const rowData: Record<string, any> = {
+      num: idx + 1,
+      orgName: a.orgName,
+      fio: a.contactFio,
+      email: a.email,
+      phone: a.phone,
+      region: a.region,
+      inn: a.inn,
+      nomination: a.nomination.title,
+      status: STATUS_LABEL_RU[a.status as AppStatus] ?? a.status,
+      avgScore: avgScore,
+      evalCount: a.evaluations.length,
+      workplace: str("workplace"),
+      position: str("position"),
+      createdAt: a.createdAt.toISOString().slice(0, 10),
+    };
+
+    // Criteria scores
+    for (const c of critDefs) {
+      const key = `crit_${c.label}`;
+      const scores = a.evaluations.map((e: any) => {
+        const s = (e.scores ?? {}) as Record<string, number>;
+        return Number(s[c.label]) || 0;
+      });
+      rowData[key] = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : "";
+    }
+
+    const row = ws.addRow(rowData);
+    row.height = 22;
+    const rowIdx = row.number;
+
+    // Alternate row coloring
+    const isEven = idx % 2 === 0;
+    const bgColor = isEven ? "FFF8F7F3" : "FFFFFFFF";
+
+    row.eachCell((cell, colNumber) => {
+      cell.font = { name: "Calibri", size: 10, color: { argb: "FF333333" } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgColor } };
+      cell.alignment = { vertical: "middle", horizontal: colNumber <= 1 ? "center" : "left" };
+      cell.border = {
+        bottom: { style: "thin" as const, color: { argb: "FFE8E8EC" } },
+      };
+    });
+
+    // Status cell with color
+    const statusCell = row.getCell("status");
+    const statusColor = STATUS_COLORS[a.status] ?? "9A9AA4";
+    statusCell.font = { name: "Calibri", size: 10, bold: true, color: { argb: "FF" + statusColor } };
+    statusCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "18" + statusColor } };
+    statusCell.alignment = { vertical: "middle", horizontal: "center" };
+
+    // Score cell coloring
+    const scoreCell = row.getCell("avgScore");
+    if (avgScore !== null) {
+      const scoreColor = avgScore >= 80 ? "2FBF6B" : avgScore >= 50 ? "F5A623" : "FF6B6B";
+      scoreCell.font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF" + scoreColor } };
+      scoreCell.alignment = { vertical: "middle", horizontal: "center" };
+    }
+
+    // Number column center
+    row.getCell("num").alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell("evalCount").alignment = { vertical: "middle", horizontal: "center" };
+    row.getCell("createdAt").alignment = { vertical: "middle", horizontal: "center" };
   });
 
-  return { csv: [header, ...rows].join("\n"), count: rows.length };
+  // ── Summary row ────────────────────────────────────────────────────────
+  const summaryRow = ws.addRow([]);
+  ws.addRow([]);
+  const statsRow = ws.addRow([
+    "", `Всего заявок: ${apps.length}`,
+    "", "", "", "", "", "",
+    `Финалистов: ${apps.filter((a) => a.status === "finalist").length}`,
+    "", "", "", "", "",
+  ]);
+  statsRow.getCell(2).font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF0804FF" } };
+  const winnerRow = ws.addRow([
+    "", `Победителей: ${apps.filter((a) => a.status === "winner").length}`,
+    "", "", "", "", "",
+    `Отклонено: ${apps.filter((a) => a.status === "rejected").length}`,
+    "", "", "", "", "",
+  ]);
+  winnerRow.getCell(2).font = { name: "Calibri", size: 11, bold: true, color: { argb: "FF2FBF6B" } };
+  winnerRow.getCell(8).font = { name: "Calibri", size: 11, bold: true, color: { argb: "FFFF6B6B" } };
+
+  // ── Auto-filter on header ──────────────────────────────────────────────
+  ws.autoFilter = {
+    from: { row: 2, column: 1 },
+    to: { row: 2, column: columns.length },
+  };
+
+  // ── Generate buffer ────────────────────────────────────────────────────
+  const buffer = await wb.xlsx.writeBuffer();
+  const base64 = Buffer.from(buffer).toString("base64");
+
+  return { ok: true, base64, filename: `premia-apps-${new Date().toISOString().slice(0, 10)}.xlsx`, count: apps.length };
 }
 
 export async function getRegions() {
