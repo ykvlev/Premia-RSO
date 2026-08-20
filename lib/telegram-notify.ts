@@ -6,6 +6,45 @@ async function isTelegramConfigured(): Promise<boolean> {
   return tgReady;
 }
 
+async function sendTelegram(text: string): Promise<boolean> {
+  if (!(await isTelegramConfigured())) return false;
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN!;
+    const chatId = process.env.TELEGRAM_NOTIFY_CHAT_ID!;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "Markdown",
+        disable_web_page_preview: true,
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// Email fallback — если Telegram заблокирован на сервере
+async function sendEmailFallback(subject: string, text: string) {
+  try {
+    const { sendMail } = await import("@/lib/mail");
+    const adminEmail = process.env.TELEGRAM_NOTIFY_EMAIL || "ykvlev_a@mail.ru";
+    await sendMail({
+      to: adminEmail,
+      subject: `[Премия] ${subject}`,
+      text,
+      html: `<div style="font-family:sans-serif;font-size:14px;color:#333;white-space:pre-wrap">${text}</div>`,
+    });
+  } catch { /* email тоже не критичен */ }
+}
+
 export async function notifyAdminLogin(data: {
   email: string;
   fio: string;
@@ -20,7 +59,7 @@ export async function notifyAdminLogin(data: {
   const flag = data.geo?.country ? getFlag(data.geo.country) : "🌐";
   const device = data.isNewDevice ? "🆕 *НОВОЕ УСТРОЙСТВО*" : "";
   const browser = parseBrowser(data.userAgent);
-  const text = [
+  const tgText = [
     `${flag} *Вход в админку*`,
     ``,
     `👤 ${data.fio}`,
@@ -33,20 +72,11 @@ export async function notifyAdminLogin(data: {
     `🕐 ${new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })}`,
   ].filter(Boolean).join("\n");
 
-  try {
-    const token = process.env.TELEGRAM_BOT_TOKEN!;
-    const chatId = process.env.TELEGRAM_NOTIFY_CHAT_ID!;
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text,
-        parse_mode: "Markdown",
-        disable_web_page_preview: true,
-      }),
-    });
-  } catch { /* telegram не критичен */ }
+  const sent = await sendTelegram(tgText);
+  if (!sent) {
+    const plainText = tgText.replace(/\*/g, "");
+    await sendEmailFallback("Вход в админку", plainText);
+  }
 }
 
 export async function notifyFailedLogin(data: {
@@ -59,7 +89,7 @@ export async function notifyFailedLogin(data: {
   if (data.reason === "rate_limited") return;
 
   const flag = data.geo?.country ? getFlag(data.geo.country) : "🌐";
-  const text = [
+  const tgText = [
     `${flag} ⚠️ *Неудачная попытка входа*`,
     ``,
     `📧 ${data.email}`,
@@ -69,15 +99,11 @@ export async function notifyFailedLogin(data: {
     `🕐 ${new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" })}`,
   ].filter(Boolean).join("\n");
 
-  try {
-    const token = process.env.TELEGRAM_BOT_TOKEN!;
-    const chatId = process.env.TELEGRAM_NOTIFY_CHAT_ID!;
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown", disable_web_page_preview: true }),
-    });
-  } catch { /* telegram не критичен */ }
+  const sent = await sendTelegram(tgText);
+  if (!sent) {
+    const plainText = tgText.replace(/\*/g, "");
+    await sendEmailFallback("Неудачная попытка входа", plainText);
+  }
 }
 
 function reasonLabel(r: string | undefined): string {
