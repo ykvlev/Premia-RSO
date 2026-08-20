@@ -188,6 +188,20 @@ model PasswordReset {
   @@index([email])
 }
 
+// Лог действий суперадминов (аудит)
+model AdminAuditLog {
+  id        String   @id @default(cuid())
+  actor     String   // email суперадмина
+  action    String   // тип действия: ban_ip, toggle_maintenance, impersonate, mass_notify, reset_password, ...
+  target    String?  // на кого/что направлено (userId, IP, и т.д.)
+  detail    Json?    // доп. данные (причина, количество получателей и т.д.)
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actor])
+}
+
 // Уведомления в профиле пользователя
 model Notification {
   id        String   @id @default(cuid())

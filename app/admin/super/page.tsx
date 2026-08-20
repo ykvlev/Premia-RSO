@@ -383,11 +383,37 @@ export default async function SuperPage() {
     const { getActiveSessions } = await import("@/app/admin/super/actions");
     const sessions = await getActiveSessions();
 
+    // Аудит-лог
+    const auditLogs = await db.adminAuditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 40,
+      select: { id: true, actor: true, action: true, target: true, detail: true, ip: true, createdAt: true },
+    });
+
+    // DB Health
+    const { getDbHealth } = await import("@/app/admin/super/actions");
+    const dbHealth = await getDbHealth();
+
+    // Registration analytics: last 30 days
+    const regPerDayRaw = await db.$queryRaw<{ d: Date; n: bigint }[]>`
+      SELECT date_trunc('day', "createdAt") AS d, COUNT(*) AS n
+      FROM "User"
+      WHERE "createdAt" >= NOW() - INTERVAL '30 days'
+      GROUP BY d ORDER BY d ASC`;
+
+    const regPerDay = regPerDayRaw.map((r) => ({
+      day: new Date(r.d).toISOString().slice(0, 10),
+      count: Number(r.n),
+    }));
+
     data.disk = disk;
     data.git = git;
     data.maintenance = maintenance;
     data.bans = bans;
     data.sessions = sessions;
+    data.auditLogs = auditLogs;
+    data.dbHealth = dbHealth;
+    data.regPerDay = regPerDay;
   } catch {
     // БД недоступна — пустой дашборд
     const perf = getPerfStats(30);
@@ -436,6 +462,9 @@ export default async function SuperPage() {
       maintenance: getMaintenanceInfo(),
       bans: [],
       sessions: [],
+      auditLogs: [],
+      dbHealth: { tables: [], totalSize: "—" },
+      regPerDay: [],
     };
   }
 

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData } from "@/app/admin/super/actions";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -101,6 +101,9 @@ export type SuperData = {
   maintenance: { active: boolean; activatedAt: string | null; activatedBy: string | null; reason: string | null };
   bans: { ip: string; reason: string; bannedBy: string; bannedAt: string }[];
   sessions: { id: string; email: string; userId: string | null; role: string | null; ip: string | null; userAgent: string | null; loginAt: string; blocked: boolean }[];
+  auditLogs: { id: string; actor: string; action: string; target: string | null; detail: any; ip: string | null; createdAt: Date }[];
+  dbHealth: { tables: { name: string; count: number; size: string }[]; totalSize: string };
+  regPerDay: { day: string; count: number }[];
 };
 
 // ─── Токены темы ────────────────────────────────────────────────────────────
@@ -863,7 +866,6 @@ function LiveLogsCard() {
         } else if (data.type === "update") {
           setEntries((prev) => {
             const merged = [...data.entries, ...prev];
-            // deduplicate by at+type+path
             const seen = new Set<string>();
             return merged.filter((e: any) => {
               const k = `${e.at}-${e.type}-${e.path ?? e.message}`;
@@ -928,6 +930,360 @@ function LiveLogsCard() {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// System Monitor — live CPU/RAM/disk через SSE
+// ═══════════════════════════════════════════════════════════════════════════
+function SystemMonitorCard() {
+  const [metrics, setMetrics] = useState<any>(null);
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    const es = new EventSource("/admin/super/metrics");
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
+    es.onmessage = (ev) => {
+      try { setMetrics(JSON.parse(ev.data)); } catch {}
+    };
+    return () => es.close();
+  }, []);
+
+  if (!metrics) {
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: connected ? C.green : "#ff3b30", boxShadow: connected ? `0 0 6px ${C.green}88` : "none" }} />
+          <span style={{ fontSize: 11, color: C.dim, fontFamily: F }}>{connected ? "Live" : "Connecting..."}</span>
+        </div>
+        <p style={{ color: C.dim, fontSize: 12, fontStyle: "italic", fontFamily: F }}>Загрузка метрик...</p>
+      </div>
+    );
+  }
+
+  const cpuPct = metrics.cpu.loadavg[0] / metrics.cpu.cores * 100;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}88` }} />
+        <span style={{ fontSize: 11, color: C.green, fontFamily: F }}>Live</span>
+        <span style={{ fontSize: 11, color: C.dim, fontFamily: MONO, marginLeft: "auto" }}>каждые 3 сек</span>
+      </div>
+
+      {/* CPU */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ fontSize: 12, fontFamily: F, color: C.muted, fontWeight: 600 }}>CPU</span>
+          <span style={{ fontSize: 12, fontFamily: MONO, color: cpuPct > 80 ? C.red : cpuPct > 50 ? C.amber : C.green }}>{cpuPct.toFixed(0)}%</span>
+        </div>
+        <div style={{ height: 6, background: "#1a1a20", borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${Math.min(100, cpuPct)}%`, background: cpuPct > 80 ? C.red : cpuPct > 50 ? C.amber : C.green, borderRadius: 999, transition: "width 0.5s" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>{metrics.cpu.cores} cores</span>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>load {metrics.cpu.loadavg.join(" / ")}</span>
+        </div>
+      </div>
+
+      {/* RAM */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ fontSize: 12, fontFamily: F, color: C.muted, fontWeight: 600 }}>RAM</span>
+          <span style={{ fontSize: 12, fontFamily: MONO, color: metrics.memory.usedPct > 90 ? C.red : metrics.memory.usedPct > 75 ? C.amber : C.green }}>{metrics.memory.usedPct}%</span>
+        </div>
+        <div style={{ height: 6, background: "#1a1a20", borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${metrics.memory.usedPct}%`, background: metrics.memory.usedPct > 90 ? C.red : metrics.memory.usedPct > 75 ? C.amber : C.green, borderRadius: 999, transition: "width 0.5s" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>{metrics.memory.freeMB} MB free</span>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>{metrics.memory.totalMB} MB total</span>
+        </div>
+      </div>
+
+      {/* Disk */}
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+          <span style={{ fontSize: 12, fontFamily: F, color: C.muted, fontWeight: 600 }}>Disk</span>
+          <span style={{ fontSize: 12, fontFamily: MONO, color: metrics.disk.pct > 90 ? C.red : metrics.disk.pct > 75 ? C.amber : C.green }}>{metrics.disk.pct}%</span>
+        </div>
+        <div style={{ height: 6, background: "#1a1a20", borderRadius: 999, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${metrics.disk.pct}%`, background: metrics.disk.pct > 90 ? C.red : metrics.disk.pct > 75 ? C.amber : C.green, borderRadius: 999, transition: "width 0.5s" }} />
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>{metrics.disk.freeGB} GB free</span>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: MONO }}>{metrics.disk.totalGB} GB total</span>
+        </div>
+      </div>
+
+      {/* Process */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+        <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px" }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: F }}>RSS</span>
+          <p style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, margin: "2px 0 0" }}>{metrics.memory.rssMB} MB</p>
+        </div>
+        <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px" }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: F }}>Heap</span>
+          <p style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, margin: "2px 0 0" }}>{metrics.memory.heapUsedMB}/{metrics.memory.heapTotalMB} MB</p>
+        </div>
+        <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px" }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: F }}>Uptime</span>
+          <p style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, margin: "2px 0 0" }}>{fmtUptime(metrics.pm2.uptime)}</p>
+        </div>
+        <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px" }}>
+          <span style={{ fontSize: 10, color: C.dim, fontFamily: F }}>Platform</span>
+          <p style={{ fontSize: 14, fontFamily: MONO, fontWeight: 700, margin: "2px 0 0" }}>{metrics.node}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Audit Log Card
+// ═══════════════════════════════════════════════════════════════════════════
+const ACTION_LABEL: Record<string, string> = {
+  ban_ip: "Забанил IP",
+  unban_ip: "Разбанил IP",
+  maintenance_on: "Включил обслуживание",
+  maintenance_off: "Выключил обслуживание",
+  impersonate: "Вход от лица",
+  force_logout: "Force logout",
+  mass_email: "Массовая рассылка",
+  mass_notify: "Массовые уведомления",
+  reset_password: "Сброс пароля",
+  ban_user: "Забанил пользователя",
+  unban_user: "Разбанил пользователя",
+  export_user_data: "Экспорт данных",
+};
+function AuditLogCard({ logs }: { logs: { id: string; actor: string; action: string; target: string | null; detail: any; ip: string | null; createdAt: Date }[] }) {
+  return (
+    <div>
+      {logs.length === 0 ? (
+        <p style={{ color: C.muted, fontSize: 12.5, fontStyle: "italic", fontFamily: F }}>Нет записей</p>
+      ) : (
+        <Scroll max={280}>
+          {logs.map((l) => (
+            <div key={l.id} style={{ padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Badge color={l.action.includes("ban") ? C.red : l.action.includes("maintenance") ? C.amber : C.accent}>
+                  {ACTION_LABEL[l.action] ?? l.action}
+                </Badge>
+                {l.target && (
+                  <span style={{ fontSize: 11, fontFamily: MONO, color: C.dim }}>
+                    {l.target.length > 12 ? l.target.slice(0, 12) + "…" : l.target}
+                  </span>
+                )}
+                <span style={{ marginLeft: "auto", fontSize: 11, color: C.dim, fontFamily: F, whiteSpace: "nowrap" }}>
+                  {fmtAgo(new Date(l.createdAt).getTime(), Date.now())}
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: C.dim, fontFamily: F, marginTop: 2 }}>
+                {l.actor}
+                {l.detail && typeof l.detail === "object" && (
+                  <span style={{ marginLeft: 6, fontFamily: MONO, fontSize: 10 }}>
+                    {l.detail.reason ? `причина: ${l.detail.reason}` : ""}
+                    {l.detail.sent ? `→ ${l.detail.sent} получателей` : ""}
+                    {l.detail.email ? `(${l.detail.email})` : ""}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </Scroll>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Quick User Actions Card
+// ═══════════════════════════════════════════════════════════════════════════
+function UserActionsCard({ users }: { users: { id: string; fio: string; email: string; role: string }[] }) {
+  const [selectedId, setSelectedId] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [resultColor, setResultColor] = useState(C.green);
+
+  function flash(text: string, color = C.green) {
+    setResult(text);
+    setResultColor(color);
+    setTimeout(() => setResult(null), 4000);
+  }
+
+  const doBan = async () => {
+    if (!selectedId) return;
+    const reason = prompt("Причина бана:");
+    if (!reason) return;
+    setBusy(true);
+    const { banUser } = await import("@/app/admin/super/actions");
+    const res = await banUser(selectedId, reason);
+    setBusy(false);
+    if (res.ok) flash("Пользователь заблокирован");
+    else flash(res.error || "Ошибка", C.red);
+  };
+
+  const doResetPassword = async () => {
+    if (!selectedId) return;
+    if (!confirm("Сгенерировать новый пароль для пользователя?")) return;
+    setBusy(true);
+    const { resetUserPassword } = await import("@/app/admin/super/actions");
+    const res = await resetUserPassword(selectedId);
+    setBusy(false);
+    if (res.ok && res.code) flash(`Новый пароль: ${res.code}`, C.green);
+    else flash(res.error || "Ошибка", C.red);
+  };
+
+  const doExport = async () => {
+    if (!selectedId) return;
+    setBusy(true);
+    const { exportUserData } = await import("@/app/admin/super/actions");
+    const res = await exportUserData(selectedId);
+    setBusy(false);
+    if (res.ok && res.data) {
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `user-${res.data.email}-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      flash("Данные экспортированы");
+    } else {
+      flash(res.error || "Ошибка", C.red);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <select
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+          style={{ flex: 1, background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13 }}
+        >
+          <option value="">— Выберите пользователя —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.fio || u.email} ({u.role})
+            </option>
+          ))}
+        </select>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button
+          onClick={doBan}
+          disabled={busy || !selectedId}
+          style={{
+            ...exportBtn,
+            background: busy || !selectedId ? C.card2 : "#ff3b3018",
+            color: busy || !selectedId ? C.dim : "#ff3b30",
+            border: `1px solid ${busy || !selectedId ? C.border : "#ff3b3055"}`,
+            cursor: busy || !selectedId ? "default" : "pointer",
+          }}
+        >
+          Забанить
+        </button>
+        <button
+          onClick={doResetPassword}
+          disabled={busy || !selectedId}
+          style={{
+            ...exportBtn,
+            background: busy || !selectedId ? C.card2 : C.amber + "18",
+            color: busy || !selectedId ? C.dim : C.amber,
+            border: `1px solid ${busy || !selectedId ? C.border : C.amber + "55"}`,
+            cursor: busy || !selectedId ? "default" : "pointer",
+          }}
+        >
+          Сбросить пароль
+        </button>
+        <button
+          onClick={doExport}
+          disabled={busy || !selectedId}
+          style={{
+            ...exportBtn,
+            background: busy || !selectedId ? C.card2 : C.accent + "18",
+            color: busy || !selectedId ? C.dim : "#c9d1ff",
+            border: `1px solid ${busy || !selectedId ? C.border : C.accent + "55"}`,
+            cursor: busy || !selectedId ? "default" : "pointer",
+          }}
+        >
+          Экспорт данных
+        </button>
+      </div>
+      {result && (
+        <p style={{ color: resultColor, fontSize: 12, fontFamily: MONO, marginTop: 8, wordBreak: "break-all" }}>{result}</p>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Registration Analytics Card
+// ═══════════════════════════════════════════════════════════════════════════
+function RegistrationAnalyticsCard({ data }: { data: { regPerDay: { day: string; count: number }[] } }) {
+  const max = Math.max(1, ...data.regPerDay.map((x) => x.count));
+  return (
+    <div>
+      {data.regPerDay.length === 0 ? (
+        <p style={{ color: C.dim, fontSize: 12.5, fontStyle: "italic", fontFamily: F }}>Нет данных за 30 дней</p>
+      ) : (
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 100 }}>
+          {data.regPerDay.map((d) => (
+            <div key={d.day} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+              <span style={{ color: C.dim, fontSize: 9, fontFamily: MONO }}>{d.count || ""}</span>
+              <div
+                title={`${d.day}: ${d.count}`}
+                style={{
+                  width: "100%",
+                  height: `${Math.max(3, (d.count / max) * 70)}px`,
+                  background: `linear-gradient(180deg, ${C.green}, ${C.green}66)`,
+                  borderRadius: "3px 3px 0 0",
+                }}
+              />
+              <span style={{ color: C.dim, fontSize: 8, fontFamily: MONO }}>{d.day.slice(5)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Database Health Card
+// ═══════════════════════════════════════════════════════════════════════════
+function DbHealthCard({ dbHealth }: { dbHealth: { tables: { name: string; count: number; size: string }[]; totalSize: string } }) {
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Badge color={C.green}>Размер БД: {dbHealth.totalSize}</Badge>
+      </div>
+      {dbHealth.tables.length === 0 ? (
+        <p style={{ color: C.dim, fontSize: 12.5, fontStyle: "italic", fontFamily: F }}>Нет данных</p>
+      ) : (
+        <Scroll max={240}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>
+                <th style={th}>Таблица</th>
+                <th style={{ ...th, textAlign: "right" }}>Строк</th>
+                <th style={{ ...th, textAlign: "right" }}>Размер</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dbHealth.tables.map((t) => (
+                <tr key={t.name}>
+                  <td style={{ ...td, fontFamily: MONO, fontSize: 12, color: C.muted }}>{t.name}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: MONO, fontWeight: 700 }}>{t.count.toLocaleString()}</td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: MONO, color: C.dim }}>{t.size}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Scroll>
+      )}
     </div>
   );
 }
@@ -1963,6 +2319,31 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* ── Live Logs ───────────────────────────────────────────────────── */}
           <Card title="Логи">
             <LiveLogsCard />
+          </Card>
+
+          {/* ── System Monitor (live) ──────────────────────────────────────── */}
+          <Card title="Мониторинг (live)">
+            <SystemMonitorCard />
+          </Card>
+
+          {/* ── Audit Log ──────────────────────────────────────────────────── */}
+          <Card title="Аудит-лог админов">
+            <AuditLogCard logs={data.auditLogs} />
+          </Card>
+
+          {/* ── Quick User Actions ─────────────────────────────────────────── */}
+          <Card title="Быстрые действия по пользователю">
+            <UserActionsCard users={data.users} />
+          </Card>
+
+          {/* ── Registration Analytics ──────────────────────────────────────── */}
+          <Card title="Регистрации · 30 дней" span={2}>
+            <RegistrationAnalyticsCard data={data} />
+          </Card>
+
+          {/* ── Database Health ─────────────────────────────────────────────── */}
+          <Card title="Здоровье БД">
+            <DbHealthCard dbHealth={data.dbHealth} />
           </Card>
         </div>
       </div>

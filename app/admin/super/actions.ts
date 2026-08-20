@@ -38,6 +38,7 @@ export async function toggleMaintenance(
     } else {
       deactivateMaintenance();
     }
+    logAdminAction(enable ? "maintenance_on" : "maintenance_off", undefined, { reason });
     revalidatePath("/admin/super");
     revalidatePath("/maintenance");
     return { ok: true, active: enable };
@@ -129,6 +130,7 @@ export async function addIpBan(
     return { ok: false, error: "Некорректный IP-адрес" };
   }
   banIp(ip.trim(), reason || "Banned by admin", "superadmin");
+  logAdminAction("ban_ip", ip.trim(), { reason });
   revalidatePath("/admin/super");
   return { ok: true };
 }
@@ -138,6 +140,7 @@ export async function removeIpBan(
 ): Promise<{ ok: boolean; error?: string }> {
   await requireRole("superadmin");
   const removed = unbanIp(ip.trim());
+  if (removed) logAdminAction("unban_ip", ip.trim());
   revalidatePath("/admin/super");
   return removed ? { ok: true } : { ok: false, error: "IP не найден в банлисте" };
 }
@@ -215,6 +218,8 @@ export async function impersonateUser(
   try {
     const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
     if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    logAdminAction("impersonate", userId, { email: user.email, role: user.role });
 
     const { SignJWT } = await import("jose");
     const secret = new TextEncoder().encode(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "");
@@ -321,6 +326,7 @@ export async function sendMassEmail(
     }
 
     revalidatePath("/admin/super");
+    logAdminAction("mass_email", undefined, { target, sent, subject });
     return { ok: true, sent };
   } catch (e) {
     recordError(e, "sendMassEmail");
@@ -382,6 +388,7 @@ export async function forceLogout(
     if (!user) return { ok: false, error: "Пользователь не найдён" };
 
     blockSession(userId, user.email, "superadmin", reason || "Force logout by admin");
+    logAdminAction("force_logout", userId, { email: user.email, reason });
     revalidatePath("/admin/super");
     return { ok: true };
   } catch (e) {
@@ -397,6 +404,180 @@ export async function unblockUserSession(
   const removed = unblockSession(userId);
   revalidatePath("/admin/super");
   return removed ? { ok: true } : { ok: false, error: "Сессия не найдена в блоклисте" };
+}
+
+// ── Audit Log ─────────────────────────────────────────────────────────────
+
+export async function logAdminAction(
+  action: string,
+  target?: string,
+  detail?: Record<string, unknown>,
+  ip?: string,
+) {
+  try {
+    const session = await requireRole();
+    await db.adminAuditLog.create({
+      data: {
+        actor: session.user.email ?? "unknown",
+        action,
+        target: target ?? undefined,
+        detail: detail ? (detail as any) : undefined,
+        ip: ip ?? undefined,
+      },
+    });
+  } catch { /* best-effort */ }
+}
+
+export async function getAuditLogs(limit = 50) {
+  await requireRole("superadmin");
+  return db.adminAuditLog.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    select: {
+      id: true,
+      actor: true,
+      action: true,
+      target: true,
+      detail: true,
+      ip: true,
+      createdAt: true,
+    },
+  });
+}
+
+// ── Quick User Actions ────────────────────────────────────────────────────
+
+export async function resetUserPassword(
+  userId: string,
+): Promise<{ ok: boolean; code?: string; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    const code = Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
+    const { hash } = await import("bcryptjs");
+    const hashVal = await hash(code, 12);
+
+    await db.user.update({ where: { id: userId }, data: { passwordHash: hashVal } });
+
+    logAdminAction("reset_password", userId, { email: user.email });
+
+    return { ok: true, code };
+  } catch (e) {
+    recordError(e, "resetUserPassword");
+    return { ok: false, error: "Ошибка сброса пароля" };
+  }
+}
+
+export async function banUser(
+  userId: string,
+  reason: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    blockSession(userId, user.email, "superadmin", reason || "Banned by admin");
+    logAdminAction("ban_user", userId, { email: user.email, reason });
+
+    revalidatePath("/admin/super");
+    return { ok: true };
+  } catch (e) {
+    recordError(e, "banUser");
+    return { ok: false, error: "Ошибка бана" };
+  }
+}
+
+export async function exportUserData(
+  userId: string,
+): Promise<{ ok: boolean; data?: Record<string, any>; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, fio: true, email: true, phone: true, gender: true, birthDate: true,
+        city: true, region: true, telegram: true, role: true, createdAt: true,
+        applications: {
+          select: {
+            id: true, orgName: true, status: true, createdAt: true,
+            nomination: { select: { title: true } },
+          },
+        },
+        evaluations: {
+          select: { id: true, scores: true, comment: true, createdAt: true },
+        },
+        notifications: {
+          select: { title: true, read: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
+    });
+    if (!user) return { ok: false, error: "Пользователь не найдён" };
+
+    logAdminAction("export_user_data", userId, { email: user.email });
+
+    return {
+      ok: true,
+      data: {
+        ...user,
+        createdAt: user.createdAt.toISOString(),
+        applications: user.applications.map((a) => ({
+          ...a,
+          nomination: a.nomination.title,
+          createdAt: a.createdAt.toISOString(),
+        })),
+        evaluations: user.evaluations.map((e) => ({
+          ...e,
+          createdAt: e.createdAt.toISOString(),
+        })),
+        notifications: user.notifications.map((n) => ({
+          ...n,
+          createdAt: n.createdAt.toISOString(),
+        })),
+      },
+    };
+  } catch (e) {
+    recordError(e, "exportUserData");
+    return { ok: false, error: "Ошибка экспорта" };
+  }
+}
+
+// ── Database Health ───────────────────────────────────────────────────────
+
+export async function getDbHealth() {
+  await requireRole("superadmin");
+  try {
+    const tableSizes = await db.$queryRaw<{ name: string; count: bigint; size: string }[]>`
+      SELECT
+        c.relname AS name,
+        c.reltuples::bigint AS count,
+        pg_size_pretty(pg_total_relation_size(c.oid)) AS size
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+      WHERE c.relkind = 'r'
+        AND n.nspname = 'public'
+      ORDER BY pg_total_relation_size(c.oid) DESC
+    `;
+
+    const dbSize = await db.$queryRaw<{ size: string }[]>`
+      SELECT pg_size_pretty(pg_database_size(current_database())) AS size
+    `;
+
+    return {
+      tables: tableSizes.map((t) => ({
+        name: t.name,
+        count: Number(t.count),
+        size: t.size,
+      })),
+      totalSize: dbSize[0]?.size ?? "—",
+    };
+  } catch {
+    return { tables: [], totalSize: "ошибка" };
+  }
 }
 
 export async function getBlockedSessionList() {
