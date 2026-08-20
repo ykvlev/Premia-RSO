@@ -129,6 +129,7 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
   const [nominationId, setNominationId] = useState("all");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [customEmails, setCustomEmails] = useState("");
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<
     | { ok: true; total: number; sent: number; failed: number }
@@ -172,11 +173,13 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
       setResult({ ok: false, error: "Заполните тему и текст письма" });
       return;
     }
+    const customCount = customEmails.split(/[,;\n]+/).filter((e) => e.trim().includes("@")).length;
     const recipientsLabel =
       STATUS_OPTS.find((s) => s.value === status)?.label ?? "выбранной группе";
+    const extra = customCount > 0 ? ` + ${customCount} кастомных` : "";
     if (
       !window.confirm(
-        `Отправить письмо «${subject.trim()}» получателям: ${recipientsLabel}?`,
+        `Отправить письмо «${subject.trim()}» получателям: ${recipientsLabel}${extra}?`,
       )
     ) {
       return;
@@ -184,11 +187,12 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
     setSending(true);
     setResult(null);
     try {
-      const r = await broadcastMail({ subject, body, status, nominationId });
+      const r = await broadcastMail({ subject, body, status, nominationId, customEmails: customEmails || undefined });
       setResult(r);
       if (r.ok) {
         setSubject("");
         setBody("");
+        setCustomEmails("");
       }
     } catch {
       setResult({ ok: false, error: "Ошибка отправки. Попробуйте ещё раз." });
@@ -259,6 +263,24 @@ export function MailingForm({ nominations }: { nominations: Nom[] }) {
             ))}
           </select>
         </div>
+      </div>
+
+      <div style={{ marginTop: 14, padding: "10px 12px", borderRadius: 8, background: "#0d0d12", border: "1px solid #1d1d25" }}>
+        <label style={{ ...labelStyle, marginBottom: 4 }}>
+          Кастомные email <span style={{ color: "#6a6a72", fontWeight: 400 }}>(необязательно — дополнительные получатели)</span>
+        </label>
+        <textarea
+          value={customEmails}
+          onChange={(e) => setCustomEmails(e.target.value)}
+          rows={2}
+          placeholder="ivan@mail.ru, petr@yandex.ru, maria@gmail.com"
+          style={{ ...inputStyle, resize: "none", lineHeight: 1.5, fontSize: 13 }}
+        />
+        {customEmails.trim() && (
+          <p style={{ color: "#6a6a72", fontSize: 11, margin: "4px 0 0", fontFamily: F }}>
+            {customEmails.split(/[,;\n]+/).filter((e) => e.trim().includes("@")).length} доп. получателей
+          </p>
+        )}
       </div>
 
       <div style={{ marginTop: 16 }}>

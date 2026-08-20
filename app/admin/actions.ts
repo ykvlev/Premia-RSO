@@ -222,6 +222,7 @@ export async function broadcastMail(input: {
   body: string;
   status?: string;
   nominationId?: string;
+  customEmails?: string;
 }) {
   await requireRole("admin", "superadmin");
   const subject = input.subject.trim();
@@ -252,8 +253,22 @@ export async function broadcastMail(input: {
       recipients.set(email, r.contactFio);
     }
   }
+
+  // Добавляем кастомные email
+  if (input.customEmails) {
+    const customList = input.customEmails
+      .split(/[,;\n]+/)
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.includes("@"));
+    for (const email of customList) {
+      if (!recipients.has(email)) {
+        recipients.set(email, email.split("@")[0]);
+      }
+    }
+  }
+
   if (recipients.size === 0) {
-    return { ok: false as const, error: "Нет получателей по выбранному фильтру" };
+    return { ok: false as const, error: "Нет получателей" };
   }
 
   // Дедлайн приёма — из активного сезона (для callout в письме).
