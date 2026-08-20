@@ -1462,11 +1462,9 @@ function DetailView({
 
       <div
         style={{
-          maxWidth: 1100,
-          margin: "0 auto",
           padding: "40px 40px",
           display: "grid",
-          gridTemplateColumns: "1fr 360px",
+          gridTemplateColumns: "1fr 380px",
           gap: 32,
           alignItems: "start",
         }}
@@ -1996,7 +1994,7 @@ function CompareView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{ maxWidth: 1440, margin: "0 auto", padding: "36px 32px" }}
+      style={{ padding: "36px 32px" }}
     >
       <div
         style={{
@@ -2422,7 +2420,7 @@ function DashboardView({ apps }: { apps: Application[] }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{ maxWidth: 1440, margin: "0 auto", padding: "36px 32px" }}
+      style={{ padding: "36px 32px" }}
     >
       {/* Header with period filter */}
       <div
@@ -3058,7 +3056,7 @@ function ListView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      style={{ maxWidth: 1440, margin: "0 auto", padding: "36px 32px" }}
+      style={{ padding: "36px 32px" }}
     >
       {/* KPI */}
       <div

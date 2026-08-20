@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
 import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData } from "@/app/admin/super/actions";
+import { FeatureFlagsCard } from "@/components/admin/super/feature-flags-card";
 import { DatabaseSchemaViewer } from "@/components/admin/db-schema-viewer";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
@@ -198,19 +199,16 @@ function msColor(ms: number): string {
 // ─── Мелкие компоненты ──────────────────────────────────────────────────────
 function Card({
   title,
-  span,
   right,
   children,
 }: {
   title: string;
-  span?: number;
   right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section
       style={{
-        gridColumn: span ? `span ${span}` : undefined,
         background: C.card,
         border: `1px solid ${C.border}`,
         borderRadius: 14,
@@ -1289,6 +1287,126 @@ function DbHealthCard({ dbHealth }: { dbHealth: { tables: { name: string; count:
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// Email Queue Card
+// ═══════════════════════════════════════════════════════════════════════════
+function EmailQueueCard() {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [stats, setStats] = useState({ total: 0, sent: 0, failed: 0 });
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
+  const load = async (status = filter) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/super/email-log?status=${status}&limit=30`);
+      const data = await res.json();
+      setLogs(data.logs ?? []);
+      setStats({ total: data.total ?? 0, sent: data.sent ?? 0, failed: data.failed ?? 0 });
+    } catch {}
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, []);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+        {(["all", "sent", "failed"] as const).map((s) => (
+          <button key={s} onClick={() => { setFilter(s); load(s); }} style={{
+            background: filter === s ? C.accent : C.card2,
+            color: filter === s ? "#fff" : C.muted,
+            border: `1px solid ${filter === s ? C.accent : C.border}`,
+            borderRadius: 6, padding: "4px 10px", fontSize: 11.5, fontFamily: F, fontWeight: 600, cursor: "pointer",
+          }}>
+            {s === "all" ? `Все (${stats.total})` : s === "sent" ? `Отправлено (${stats.sent})` : `Ошибки (${stats.failed})`}
+          </button>
+        ))}
+      </div>
+      {loading ? (
+        <p style={{ color: C.dim, fontSize: 12, fontFamily: F }}>Загрузка...</p>
+      ) : logs.length === 0 ? (
+        <p style={{ color: C.dim, fontSize: 12, fontFamily: F, fontStyle: "italic" }}>Пока нет записей</p>
+      ) : (
+        <Scroll max={260}>
+          {logs.map((l: any) => (
+            <div key={l.id} style={{ padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Badge color={l.status === "sent" ? C.green : C.red}>{l.status}</Badge>
+                <span style={{ fontSize: 12, fontFamily: F, color: C.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.subject}</span>
+              </div>
+              <div style={{ fontSize: 11, color: C.dim, fontFamily: MONO, marginTop: 2 }}>
+                {l.to} · {fmtAgo(new Date(l.createdAt).getTime(), Date.now())}
+              </div>
+              {l.error && <div style={{ fontSize: 10, color: C.red, fontFamily: MONO, marginTop: 2 }}>{l.error}</div>}
+            </div>
+          ))}
+        </Scroll>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DB Backup Card
+// ═══════════════════════════════════════════════════════════════════════════
+function DbBackupCard() {
+  const [backups, setBackups] = useState<{ name: string; size: number; date: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/admin/super/db-backup").then(r => r.json()).then(d => setBackups(d.backups ?? [])).catch(() => {});
+  }, []);
+
+  const doBackup = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/admin/super/db-backup", { method: "POST" });
+      const data = await res.json();
+      if (data.ok) {
+        setMsg(`Бэкап создан: ${data.filename} (${fmtBytes(data.size)})`);
+        setBackups([{ name: data.filename, size: data.size, date: new Date().toISOString() }, ...backups]);
+      } else {
+        setMsg(`Ошибка: ${data.error}`);
+      }
+    } catch (e: any) {
+      setMsg(`Ошибка: ${e.message}`);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div>
+      <button onClick={doBackup} disabled={busy} style={{
+        ...exportBtn,
+        background: busy ? C.card2 : C.green,
+        color: busy ? C.dim : "#fff",
+        border: `1px solid ${busy ? C.border : C.green}`,
+        marginBottom: 12, cursor: busy ? "default" : "pointer",
+      }}>
+        {busy ? "Создаю бэкап..." : "Создать бэкап PostgreSQL"}
+      </button>
+      {msg && <p style={{ color: msg.includes("Ошибка") ? C.red : C.green, fontSize: 12, fontFamily: F, margin: "0 0 8px" }}>{msg}</p>}
+      {backups.length === 0 ? (
+        <p style={{ color: C.dim, fontSize: 12, fontFamily: F, fontStyle: "italic" }}>Бэкапов пока нет</p>
+      ) : (
+        <Scroll max={200}>
+          {backups.map((b) => (
+            <div key={b.name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <span style={{ fontFamily: MONO, fontSize: 12, color: C.text }}>{b.name}</span>
+                <span style={{ color: C.dim, fontSize: 11, marginLeft: 8 }}>{fmtBytes(b.size)}</span>
+              </div>
+              <span style={{ fontSize: 11, color: C.dim, fontFamily: F }}>{fmtAgo(new Date(b.date).getTime(), Date.now())}</span>
+            </div>
+          ))}
+        </Scroll>
+      )}
+    </div>
+  );
+}
+
 // ─── Основной дашборд ───────────────────────────────────────────────────────
 export function SuperDashboard({ data }: { data: SuperData }) {
   const router = useRouter();
@@ -1496,7 +1614,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
         </div>
       </header>
 
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "22px 24px 80px" }}>
+      <div style={{ padding: "22px 28px 80px" }}>
         {/* Полоса здоровья системы */}
         <div
           style={{
@@ -1653,7 +1771,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 16,
           }}
         >
@@ -1752,7 +1870,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* Заявки по номинациям */}
-          <Card title="Заявки по номинациям" span={2}>
+          <Card title="Заявки по номинациям">
             {data.nominations.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Номинаций нет.</p>
             ) : (
@@ -1765,7 +1883,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* Динамика подачи */}
-          <Card title="Подача заявок · 14 дней" span={2}>
+          <Card title="Подача заявок · 14 дней">
             {data.perDay.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Нет данных за период.</p>
             ) : (
@@ -1790,7 +1908,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* Журнал входов */}
-          <Card title="Журнал входов" span={2}>
+          <Card title="Журнал входов">
             {data.recentLogins.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Входов пока не было.</p>
             ) : (
@@ -1871,7 +1989,6 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* Ошибки */}
           <Card
             title="Последние ошибки"
-            span={2}
             right={
               data.errors.length > 0 ? (
                 <button
@@ -1919,7 +2036,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* Люди и доступ */}
-          <Card title="Пользователи и доступ" span={2}>
+          <Card title="Пользователи и доступ">
             <Scroll max={360}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
@@ -2012,7 +2129,6 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* Конфигурация окружения */}
           <Card
             title="Конфигурация окружения"
-            span={2}
             right={
               <button
                 onClick={() => setShowEnvKeys((v) => !v)}
@@ -2134,7 +2250,6 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           {/* Живой лог запросов */}
           <Card
             title="Живой лог запросов"
-            span={2}
             right={
               <span style={{ color: C.dim, fontSize: 11, fontFamily: F }}>
                 ~{data.reqStats.perMinute}/мин · {data.reqStats.total} за {data.reqStats.windowMinutes} мин
@@ -2199,7 +2314,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* Действия и экспорт */}
-          <Card title="Действия и экспорт" span={2}>
+          <Card title="Действия и экспорт">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <a href="/admin/super/export?type=logins" style={exportBtn}>↓ Журнал входов · CSV</a>
               <a href="/admin/super/export?type=events" style={exportBtn}>↓ Аудит-лог · CSV</a>
@@ -2287,7 +2402,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
+            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 16,
             marginTop: 16,
           }}
@@ -2338,7 +2453,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           </Card>
 
           {/* ── Registration Analytics ──────────────────────────────────────── */}
-          <Card title="Регистрации · 30 дней" span={2}>
+          <Card title="Регистрации · 30 дней">
             <RegistrationAnalyticsCard data={data} />
           </Card>
 
@@ -2347,8 +2462,23 @@ export function SuperDashboard({ data }: { data: SuperData }) {
             <DbHealthCard dbHealth={data.dbHealth} />
           </Card>
 
+          {/* ── Feature Flags ─────────────────────────────────────────────── */}
+          <Card title="Feature Flags">
+            <FeatureFlagsCard />
+          </Card>
+
+          {/* ── Email Queue ───────────────────────────────────────────────── */}
+          <Card title="Очередь писем">
+            <EmailQueueCard />
+          </Card>
+
+          {/* ── DB Backup ─────────────────────────────────────────────────── */}
+          <Card title="Бэкап БД">
+            <DbBackupCard />
+          </Card>
+
           {/* ── DB Schema Visual ──────────────────────────────────────────── */}
-          <Card title="Структура БД · ERD" span={2}>
+          <Card title="Структура БД · ERD">
             <DatabaseSchemaViewer tables={data.dbHealth?.tables} />
           </Card>
         </div>

@@ -202,6 +202,41 @@ model AdminAuditLog {
   @@index([actor])
 }
 
+// Фича-флаги (управление без деплоя)
+model FeatureFlag {
+  id          String   @id @default(cuid())
+  key         String   @unique // например: registration_open, captcha_enabled, vk_enabled
+  label       String   // человекочитаемое название
+  description String?
+  enabled     Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+}
+
+// Лог отправленных писем
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String
+  status    String   @default("sent") // sent | failed | queued
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+// Шаблоны уведомлений
+model NotificationTemplate {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  subject   String
+  body      String
+  category  String   @default("general") // general | status | reminder | system
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Уведомления в профиле пользователя
 model Notification {
   id        String   @id @default(cuid())
