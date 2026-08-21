@@ -269,6 +269,8 @@ export default async function SuperPage() {
         reason: l.reason,
         ip: l.ip,
         userAgent: l.userAgent,
+        geoCountry: (l as any).geoCountry ?? null,
+        geoCity: (l as any).geoCity ?? null,
         at: l.createdAt.getTime(),
       })),
       recentEvents: recentEvents.map((e) => ({

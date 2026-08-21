@@ -1453,47 +1453,49 @@ function LiveNetworkFeed({ bans }: { bans: BanItem[] }) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 09 · GeoIP Intelligence
 // ═══════════════════════════════════════════════════════════════════════════
-const GEO_POOL: { flag: string; country: string }[] = [
-  { flag: "🇷🇺", country: "RU" },
-  { flag: "🇺🇸", country: "US" },
-  { flag: "🇩🇪", country: "DE" },
-  { flag: "🇳🇱", country: "NL" },
-  { flag: "🇫🇷", country: "FR" },
-  { flag: "🇬🇧", country: "GB" },
-  { flag: "🇨🇳", country: "CN" },
-  { flag: "🇧🇷", country: "BR" },
-  { flag: "🇮🇳", country: "IN" },
-  { flag: "🇵🇱", country: "PL" },
-  { flag: "🇺🇦", country: "UA" },
-  { flag: "🇰🇿", country: "KZ" },
-];
-
-function geoOf(ip: string): { flag: string; country: string } {
-  if (ip === "::1" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) {
-    return { flag: "🏠", country: "LOCAL" };
-  }
-  let h = 0;
-  for (let i = 0; i < ip.length; i++) h = (h * 31 + ip.charCodeAt(i)) >>> 0;
-  return GEO_POOL[h % GEO_POOL.length];
-}
-
 type GeoRow = {
   ip: string;
   flag: string;
   country: string;
+  city: string;
   ok: number;
   fail: number;
   total: number;
   last: number;
 };
 
+const FLAG_MAP: Record<string, string> = {
+  RU: "🇷🇺", US: "🇺🇸", DE: "🇩🇪", NL: "🇳🇱", FR: "🇫🇷", GB: "🇬🇧", CN: "🇨🇳", BR: "🇧🇷", IN: "🇮🇳", PL: "🇵🇱", UA: "🇺🇦", KZ: "🇰🇿", TR: "🇹🇷", JP: "🇯🇵", KR: "🇰🇷", IT: "🇮🇹", ES: "🇪🇸", CA: "🇨🇦", AU: "🇦🇺", BY: "🇧🇾", UZ: "🇺🇿", AZ: "🇦🇿", GE: "🇬🇪", TH: "🇹🇭", VN: "🇻🇳", ID: "🇮🇩", PH: "🇵🇭", MY: "🇲🇾", SG: "🇸🇬", HK: "🇭🇰", TW: "🇹🇼", CZ: "🇨🇿", SK: "🇸🇰", HU: "🇭🇺", RO: "🇷🇴", BG: "🇧🇬", RS: "🇷🇸", HR: "🇭🇷", SE: "🇸🇪", NO: "🇳🇴", FI: "🇫🇮", DK: "🇩🇰", AT: "🇦🇹", CH: "🇨🇭", BE: "🇧🇪", PT: "🇵🇹", GR: "🇬🇷", IE: "🇮🇪", IL: "🇮🇱", AE: "🇦🇪", SA: "🇸🇦", EG: "🇪🇬", ZA: "🇿🇦", NG: "🇳🇬", MX: "🇲🇽", AR: "🇦🇷", CL: "🇨🇱", CO: "🇨🇴",   PE: "🇵🇪" };
+
+function flagFor(country: string): string {
+  if (!country || country === "LOCAL") return "🏠";
+  return FLAG_MAP[country.toUpperCase()] ?? "🌐";
+}
+
+function guessCountry(ip: string): string {
+  if (ip === "::1" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) return "LOCAL";
+  // Частные/сервисные диапазоны
+  if (/^(0\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|169\.254\.|198\.1[89]\.|198\.51\.100\.|203\.0\.113\.|224\.|240\.)/.test(ip)) return "LOCAL";
+  return "—";
+}
+
 function buildGeoRows(data: SuperData): GeoRow[] {
   const map = new Map<string, GeoRow>();
-  const touch = (ip: string): GeoRow => {
+  const touch = (ip: string, geoCountry?: string | null, geoCity?: string | null): GeoRow => {
     let row = map.get(ip);
     if (!row) {
-      const g = geoOf(ip);
-      row = { ip, flag: g.flag, country: g.country, ok: 0, fail: 0, total: 0, last: 0 };
+      const cc = geoCountry?.toUpperCase() || null;
+      const city = geoCity || "—";
+      row = {
+        ip,
+        flag: cc ? flagFor(cc) : "🌐",
+        country: cc || guessCountry(ip),
+        city,
+        ok: 0,
+        fail: 0,
+        total: 0,
+        last: 0,
+      };
       map.set(ip, row);
     }
     return row;
@@ -1501,7 +1503,7 @@ function buildGeoRows(data: SuperData): GeoRow[] {
 
   for (const l of data.recentLogins) {
     if (!l.ip) continue;
-    const row = touch(l.ip);
+    const row = touch(l.ip, l.geoCountry, l.geoCity);
     if (l.success) row.ok++;
     else row.fail++;
     row.total++;
@@ -1577,6 +1579,7 @@ function GeoIpIntelligence({ data, now }: { data: SuperData; now: number }) {
                   <td style={td}>
                     <span style={{ marginRight: 6 }}>{r.flag}</span>
                     <span style={{ color: C.dim, fontSize: 10.5 }}>{r.country}</span>
+                    {r.city && r.city !== "—" && <span style={{ color: C.dim, fontSize: 9.5, marginLeft: 4 }}>/ {r.city}</span>}
                   </td>
                   <td style={{ ...td, color: hot ? C.red : warm ? C.amber : C.text, fontWeight: hot ? 800 : 400 }}>{r.ip}</td>
                   <td style={{ ...td, textAlign: "right", color: C.muted }}>{r.total}</td>

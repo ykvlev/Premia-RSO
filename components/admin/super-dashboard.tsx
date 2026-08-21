@@ -42,6 +42,8 @@ export type SuperData = {
     reason: string | null;
     ip: string | null;
     userAgent: string | null;
+    geoCountry: string | null;
+    geoCity: string | null;
     at: number;
   }[];
   recentEvents: { id: string; actor: string; action: string; at: number }[];
