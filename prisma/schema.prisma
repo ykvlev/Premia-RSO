@@ -99,8 +99,24 @@ model Application {
   attachments     Attachment[]
   evaluations     Evaluation[]
   events          ApplicationEvent[]
+  comments        ApplicationComment[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @default(now()) @updatedAt
+}
+
+// Комментарии к заявке (обсуждение участник ↔ оргкомитет/жюри)
+model ApplicationComment {
+  id            String      @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  author        String      // email автора
+  authorName    String      // отображаемое имя
+  authorRole    String      // participant | admin | jury | system
+  body          String
+  isInternal    Boolean     @default(false) // внутренний комментарий (участник не видит)
+  createdAt     DateTime    @default(now())
+
+  @@index([applicationId])
 }
 
 // Самоотвод жюри по заявке (конфликт интересов) — заявку не оценивает.

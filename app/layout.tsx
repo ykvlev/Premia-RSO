@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { ConfirmProvider } from "@/components/ui/confirm-dialog";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { BackToTop } from "@/components/ui/back-to-top";
+import { CommandPalette } from "@/components/command-palette";
 import "./globals.css";
 
 const SITE_URL = "https://премиятрудкрут.рф";
@@ -93,6 +94,7 @@ export default function RootLayout({
               <ProgressBar />
               {children}
               <BackToTop />
+              <CommandPalette />
             </ConfirmProvider>
           </ToastProvider>
         </ThemeProvider>

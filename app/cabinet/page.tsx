@@ -6,6 +6,11 @@ import { ChangePasswordForm } from "@/components/change-password-form";
 import { CabinetTheme } from "@/components/cabinet-theme";
 import { DeadlineTimer } from "@/components/deadline-timer";
 import { NotificationBell } from "@/components/notification-bell";
+import { ApplicationPipeline } from "@/components/application-pipeline";
+import { ActivityTimeline } from "@/components/application-timeline";
+import { DocumentVault } from "@/components/document-vault";
+import { ApplicationComments } from "@/components/application-comments";
+import { ParticipantProtocolLink } from "@/components/participant-protocol";
 import type { AppStatus } from "@/lib/generated/prisma/client";
 
 export const metadata: Metadata = { title: "Личный кабинет" };
@@ -22,138 +27,24 @@ const STATUS: Record<AppStatus, { label: string; color: string }> = {
   rejected: { label: "Отклонена", color: "#6a6a72" },
 };
 
-/** Этапы движения заявки для визуального прогресса (линейный «счастливый путь»). */
-const FLOW: { key: AppStatus; label: string }[] = [
-  { key: "new", label: "Отправлена" },
-  { key: "queued", label: "Ожидает" },
-  { key: "review", label: "Рассмотрение" },
-  { key: "scoring", label: "Оценка жюри" },
-  { key: "finalist", label: "Финал" },
-  { key: "winner", label: "Победа" },
-];
-
-/** Горизонтальный степпер прогресса заявки. */
-function Stepper({ status }: { status: AppStatus }) {
-  if (status === "rejected") {
-    return (
-      <div
-        style={{
-          marginTop: 14,
-          padding: "10px 14px",
-          background: "var(--cab-rej-bg)",
-          border: "1px solid var(--cab-rej-bd)",
-          borderRadius: 8,
-          color: "var(--cab-rej-tx)",
-          fontSize: 12,
-          fontWeight: 600,
-          lineHeight: 1.5,
-        }}
-      >
-        Заявка отклонена. Спасибо за участие — вы можете подать заявку на другую
-        номинацию.
-      </div>
-    );
-  }
-  if (status === "revision") {
-    return (
-      <div
-        style={{
-          marginTop: 14,
-          padding: "10px 14px",
-          background: "var(--cab-warn-bg)",
-          border: "1px solid var(--cab-warn-bd)",
-          borderRadius: 8,
-          color: "var(--cab-warn-tx)",
-          fontSize: 12,
-          fontWeight: 600,
-          lineHeight: 1.5,
-        }}
-      >
-        Заявка требует доработки. Ознакомьтесь с комментарием эксперта ниже и при
-        необходимости свяжитесь с оргкомитетом.
-      </div>
-    );
-  }
-  const current = FLOW.findIndex((f) => f.key === status);
-  return (
-    <div
-      style={{
-        marginTop: 18,
-        paddingTop: 16,
-        borderTop: "1px solid var(--cab-border-soft)",
-        display: "flex",
-        alignItems: "flex-start",
-      }}
-    >
-      {FLOW.map((step, i) => {
-        const done = i <= current;
-        const isCurrent = i === current;
-        return (
-          <div
-            key={step.key}
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              position: "relative",
-            }}
-          >
-            {i < FLOW.length - 1 && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: 7,
-                  left: "50%",
-                  right: "-50%",
-                  height: 2,
-                  background: i < current ? "#0804ff" : "var(--cab-border)",
-                }}
-              />
-            )}
-            <div
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: "50%",
-                background: done ? "#0804ff" : "var(--cab-surface2)",
-                border: `2px solid ${done ? "#0804ff" : "var(--cab-border)"}`,
-                zIndex: 1,
-                boxShadow: isCurrent ? "0 0 0 4px #0804ff22" : "none",
-              }}
-            />
-            <span
-              style={{
-                marginTop: 8,
-                fontSize: 10.5,
-                fontWeight: isCurrent ? 700 : 500,
-                color: done ? "var(--cab-text2)" : "var(--cab-faint)",
-                textAlign: "center",
-                lineHeight: 1.3,
-                letterSpacing: "0.2px",
-              }}
-            >
-              {step.label}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Личный кабинет участника: все его заявки (по email аккаунта). */
 export default async function CabinetPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const email = session.user.email ?? "";
   const userId = session.user.id;
+  const userName = session.user.name || "Участник";
 
-  const [apps, season, user]: [any[], { endAt: Date } | null, any] = await safeDb(
+  const [apps, season, user, allEvents]: [any[], { endAt: Date } | null, any, any[]] = await safeDb(
     async () => {
       const a = await db.application.findMany({
         where: { email },
-        include: { nomination: { select: { title: true } } },
+        include: {
+          nomination: { select: { title: true } },
+          attachments: { select: { id: true, filename: true, url: true, mime: true, size: true } },
+          events: { orderBy: { createdAt: "desc" }, take: 10 },
+          comments: { orderBy: { createdAt: "asc" } },
+          evaluations: { select: { juryUserId: true, scores: true, comment: true } },
+        },
         orderBy: { createdAt: "desc" },
       });
       const s = await db.season.findFirst({ where: { isActive: true }, select: { endAt: true } });
@@ -161,9 +52,9 @@ export default async function CabinetPage() {
         where: { id: userId },
         select: { fio: true, phone: true, gender: true, birthDate: true, city: true, region: true },
       });
-      return [a, s, u] as const;
+      return [a, s, u, []] as const;
     },
-    [[] as any[], null, null],
+    [[] as any[], null, null, []],
   );
 
   const profileComplete = user && user.fio && user.phone && user.gender && user.birthDate && user.city && user.region;
@@ -186,17 +77,15 @@ export default async function CabinetPage() {
         <NotificationBell />
       </div>
       <h1 style={{ color: "var(--cab-text)", fontSize: 30, fontWeight: 800, margin: "0 0 6px" }}>
-        Здравствуйте, {session.user.name || "участник"}!
+        Здравствуйте, {userName}!
       </h1>
       <p style={{ color: "var(--cab-muted)", fontSize: 14, margin: "0 0 24px" }}>
         Ваши заявки и их статусы. Одним аккаунтом можно подать заявки на разные
         номинации.
       </p>
 
-      {/* Таймер до закрытия приёма заявок */}
       {season && <DeadlineTimer endAt={season.endAt.toISOString()} />}
 
-      {/* Кнопки навигации */}
       <div style={{ display: "flex", gap: 10, marginTop: 16, marginBottom: 24, flexWrap: "wrap" }}>
         <a
           href="/apply"
@@ -298,15 +187,25 @@ export default async function CabinetPage() {
           </a>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {apps.map((a) => {
             const st = STATUS[a.status as AppStatus];
             const nominee =
               (a.payload as { nomineeFio?: string } | null)?.nomineeFio || a.contactFio;
+            const comments = (a.comments || []).map((c: any) => ({
+              ...c,
+              createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt),
+            }));
+            const events = (a.events || []).map((e: any) => ({
+              ...e,
+              createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),
+            }));
+            const attachments = (a.attachments || []).map((att: any) => ({
+              ...att,
+            }));
             return (
               <div
                 key={a.id}
-                className="hover-card"
                 style={{
                   background: "var(--cab-surface)",
                   border: "1px solid var(--cab-border)",
@@ -316,6 +215,7 @@ export default async function CabinetPage() {
                   flexDirection: "column",
                 }}
               >
+                {/* Header row */}
                 <div
                   style={{
                     display: "flex",
@@ -341,43 +241,8 @@ export default async function CabinetPage() {
                       Номинант: {nominee}
                     </p>
                     <p style={{ color: "var(--cab-faint)", fontSize: 12, margin: 0 }}>
-                      Подана {a.createdAt.toLocaleDateString("ru-RU")} · №{" "}
-                      {a.id.slice(-6)}
+                      Подана {a.createdAt.toLocaleDateString("ru-RU")} · № {a.id.slice(-6)}
                     </p>
-                    {a.expertComment && (
-                      <p
-                        style={{
-                          color: "var(--cab-text2)",
-                          fontSize: 13,
-                          margin: "10px 0 0",
-                          padding: "10px 12px",
-                          background: "var(--cab-inset)",
-                          borderLeft: "2px solid #0804ff",
-                          borderRadius: 6,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        Комментарий эксперта: {a.expertComment}
-                      </p>
-                    )}
-                    {(a.status === "winner" || a.status === "finalist") && (
-                      <a
-                        href={`/certificate/${a.id}`}
-                        style={{
-                          display: "inline-block",
-                          marginTop: 12,
-                          background: "#0804ff",
-                          color: "#fff",
-                          fontSize: 13,
-                          fontWeight: 700,
-                          borderRadius: 999,
-                          padding: "9px 18px",
-                          textDecoration: "none",
-                        }}
-                      >
-                        Скачать сертификат
-                      </a>
-                    )}
                   </div>
                   <span
                     style={{
@@ -396,7 +261,117 @@ export default async function CabinetPage() {
                     {st.label}
                   </span>
                 </div>
-                <Stepper status={a.status} />
+
+                {/* Pipeline */}
+                <ApplicationPipeline
+                  status={a.status}
+                  createdAt={a.createdAt.toISOString()}
+                  updatedAt={a.updatedAt.toISOString()}
+                />
+
+                {/* Expert comment */}
+                {a.expertComment && (
+                  <div
+                    style={{
+                      marginTop: 14,
+                      padding: "12px 14px",
+                      background: "var(--cab-inset)",
+                      borderLeft: "3px solid #0804ff",
+                      borderRadius: "0 8px 8px 0",
+                    }}
+                  >
+                    <p style={{ color: "var(--cab-text2)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 4px" }}>
+                      Комментарий эксперта
+                    </p>
+                    <p style={{ color: "var(--cab-text2)", fontSize: 13, margin: 0, lineHeight: 1.5 }}>
+                      {a.expertComment}
+                    </p>
+                  </div>
+                )}
+
+                {/* Certificate */}
+                {(a.status === "winner" || a.status === "finalist") && (
+                  <a
+                    href={`/certificate/${a.id}`}
+                    style={{
+                      display: "inline-block",
+                      marginTop: 12,
+                      background: "#0804ff",
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      borderRadius: 999,
+                      padding: "9px 18px",
+                      textDecoration: "none",
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    Скачать сертификат
+                  </a>
+                )}
+
+                {/* Protocol download — available after first evaluation */}
+                {a.evaluations && a.evaluations.length > 0 && (
+                  <div style={{ marginTop: 12, alignSelf: "flex-start" }}>
+                    <ParticipantProtocolLink
+                      application={{
+                        id: a.id,
+                        status: a.status,
+                        contactFio: a.contactFio,
+                        orgName: a.orgName,
+                        email: a.email,
+                        phone: a.phone,
+                        region: a.region,
+                        createdAt: a.createdAt.toISOString(),
+                        nominationTitle: a.nomination.title,
+                        expertComment: a.expertComment || undefined,
+                        evaluations: a.evaluations.map((ev: any) => ({
+                          juryName: ev.juryUserId,
+                          scores: ev.scores as Record<string, number>,
+                          total: Object.values(ev.scores as Record<string, number>).reduce((sum: number, v: number) => sum + v, 0),
+                          comment: ev.comment || undefined,
+                        })),
+                        events: (a.events || []).map((e: any) => ({
+                          action: e.action,
+                          createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),
+                        })),
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Activity Timeline */}
+                {events.length > 0 && (
+                  <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--cab-border-soft)" }}>
+                    <p style={{ color: "var(--cab-faint)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>
+                      История действий
+                    </p>
+                    <ActivityTimeline events={events} />
+                  </div>
+                )}
+
+                {/* Document Vault */}
+                {attachments.length > 0 && (
+                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--cab-border-soft)" }}>
+                    <p style={{ color: "var(--cab-faint)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>
+                      Документы ({attachments.length})
+                    </p>
+                    <DocumentVault attachments={attachments} />
+                  </div>
+                )}
+
+                {/* Comments */}
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--cab-border-soft)" }}>
+                  <p style={{ color: "var(--cab-faint)", fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", margin: "0 0 10px" }}>
+                    Обсуждение ({comments.length})
+                  </p>
+                  <ApplicationComments
+                    comments={comments}
+                    applicationId={a.id}
+                    userRole="participant"
+                    userName={userName}
+                  />
+                </div>
               </div>
             );
           })}
