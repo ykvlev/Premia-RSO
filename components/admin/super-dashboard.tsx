@@ -11,6 +11,8 @@ import { HeatmapCard } from "@/components/admin/super/heatmap-card";
 import { JuryChartsCard } from "@/components/admin/super/jury-charts-card";
 import { SSLMonitorCard } from "@/components/admin/super/ssl-monitor-card";
 import { DatabaseSchemaViewer } from "@/components/admin/db-schema-viewer";
+import { TabNav } from "@/components/admin/super/tab-nav";
+import { SecurityCenter } from "@/components/admin/super/security-center";
 
 // ─── Типы данных панели ─────────────────────────────────────────────────────
 export type SuperData = {
@@ -1451,6 +1453,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
   const [showEnvKeys, setShowEnvKeys] = useState(false);
   const [maintenanceActive, setMaintenanceActive] = useState(data.maintenance.active);
   const [maintPending, setMaintPending] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   function flash(text: string) {
     setMsg(text);
@@ -1621,7 +1624,33 @@ export function SuperDashboard({ data }: { data: SuperData }) {
         </div>
       </header>
 
-      <div style={{ padding: "22px 28px 80px" }}>
+      {/* Tab Navigation */}
+      <div
+        style={{
+          borderBottom: `1px solid ${C.border}`,
+          padding: "6px 24px 0",
+          background: "rgba(8,8,10,0.6)",
+        }}
+      >
+        <TabNav
+          tabs={[
+            { id: "overview", icon: "📊", label: "Обзор" },
+            { id: "security", icon: "🔒", label: "Безопасность", alert: data.failedByIp.some(r => r.fails >= 5) },
+            { id: "apps", icon: "📝", label: "Заявки" },
+            { id: "people", icon: "👥", label: "Люди" },
+            { id: "jury", icon: "⚖️", label: "Жюри" },
+            { id: "comms", icon: "📬", label: "Коммуникации" },
+            { id: "logs", icon: "📋", label: "Журналы" },
+            { id: "system", icon: "⚙️", label: "Система" },
+          ]}
+          active={activeTab}
+          onChange={setActiveTab}
+        />
+      </div>
+
+      <div style={{ padding: "16px 24px 80px" }}>
+        {/* ═══════════════════ ТАБ: ОБЗОР ═══════════════════ */}
+        {activeTab === "overview" && (<>
         {/* Полоса здоровья системы */}
         <div
           style={{
@@ -1773,7 +1802,14 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           <Stat label="Событий по заявкам" value={k.appEvents} sub="аудит-лог" />
           <Stat label="Сезонов" value={k.seasons} sub={data.activeSeason ? `активен ${data.activeSeason.year}` : "нет активного"} />
         </div>
+        </>)}
 
+        {/* ═══════════════════ ТАБ: БЕЗОПАСНОСТЬ ═══════════════════ */}
+        {activeTab === "security" && (
+          <SecurityCenter data={data} />
+        )}
+
+        {/* ═══════════════════ ТАБ: ЗАЯВКИ ═══════════════════ */}
         {/* Основная сетка */}
         <div
           style={{
@@ -1783,6 +1819,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
           }}
         >
           {/* Статус фич */}
+          {activeTab === "overview" && (
           <Card title="Интеграции и фичи">
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <FeatureDot on={data.features.db} label="База данных" />
@@ -1799,8 +1836,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </p>
             )}
           </Card>
+          )}
 
           {/* Производительность */}
+          {activeTab === "overview" && (
           <Card title={`Производительность · окно ${data.perf.windowMinutes} мин`}>
             <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
               <Badge color={C.green}>p50 {data.perf.p50} мс</Badge>
@@ -1839,8 +1878,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Заявки по статусам */}
+          {activeTab === "apps" && (
           <Card title="Заявки по статусам">
             {data.byStatus.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Заявок пока нет.</p>
@@ -1859,8 +1900,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
                 ))
             )}
           </Card>
+          )}
 
           {/* Пользователи по ролям */}
+          {activeTab === "people" && (
           <Card title="Пользователи по ролям">
             {data.usersByRole
               .slice()
@@ -1875,8 +1918,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
                 />
               ))}
           </Card>
+          )}
 
           {/* Заявки по номинациям */}
+          {activeTab === "apps" && (
           <Card title="Заявки по номинациям">
             {data.nominations.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Номинаций нет.</p>
@@ -1888,8 +1933,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
                 ))
             )}
           </Card>
+          )}
 
           {/* Динамика подачи */}
+          {activeTab === "apps" && (
           <Card title="Подача заявок · 14 дней">
             {data.perDay.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Нет данных за период.</p>
@@ -1913,8 +1960,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </div>
             )}
           </Card>
+          )}
 
           {/* Журнал входов */}
+          {activeTab === "logs" && (
           <Card title="Журнал входов">
             {data.recentLogins.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Входов пока не было.</p>
@@ -1953,8 +2002,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Последние заявки */}
+          {activeTab === "apps" && (
           <Card title="Последние заявки">
             {data.recentApps.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Заявок нет.</p>
@@ -1974,8 +2025,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Аудит-лог действий */}
+          {activeTab === "logs" && (
           <Card title="Активность (аудит-лог)">
             {data.recentEvents.length === 0 ? (
               <p style={{ color: C.dim, fontSize: 12.5, margin: 0, fontFamily: F }}>Событий нет.</p>
@@ -1992,8 +2045,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Ошибки */}
+          {activeTab === "logs" && (
           <Card
             title="Последние ошибки"
             right={
@@ -2041,8 +2096,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Люди и доступ */}
+          {activeTab === "people" && (
           <Card title="Пользователи и доступ">
             <Scroll max={360}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -2086,8 +2143,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </table>
             </Scroll>
           </Card>
+          )}
 
           {/* Безопасность: попытки по IP */}
+          {activeTab === "security" && (
           <Card title="Безопасность · входы по IP (24ч)">
             {data.failedByIp.length === 0 ? (
               <p style={{ color: C.green, fontSize: 12.5, margin: 0, fontFamily: F }}>
@@ -2132,8 +2191,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Конфигурация окружения */}
+          {activeTab === "system" && (
           <Card
             title="Конфигурация окружения"
             right={
@@ -2253,8 +2314,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </div>
             )}
           </Card>
+          )}
 
           {/* Живой лог запросов */}
+          {activeTab === "logs" && (
           <Card
             title="Живой лог запросов"
             right={
@@ -2319,8 +2382,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </Scroll>
             )}
           </Card>
+          )}
 
           {/* Действия и экспорт */}
+          {activeTab === "system" && (
           <Card title="Действия и экспорт">
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
               <a href="/admin/super/export?type=logins" style={exportBtn}>↓ Журнал входов · CSV</a>
@@ -2387,8 +2452,10 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </div>
             </div>
           </Card>
+          )}
 
           {/* Счётчики таблиц */}
+          {activeTab === "system" && (
           <Card title="Таблицы БД">
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
@@ -2401,6 +2468,7 @@ export function SuperDashboard({ data }: { data: SuperData }) {
               </tbody>
             </table>
           </Card>
+          )}
         </div>
 
         {/* ════════════════════════════════════════════════════════════════════ */}
@@ -2414,100 +2482,124 @@ export function SuperDashboard({ data }: { data: SuperData }) {
             marginTop: 16,
           }}
         >
-          {/* ── IP Ban ──────────────────────────────────────────────────────── */}
-          <Card title="IP Баны">
-            <IpBanSection bans={data.bans} />
-          </Card>
-
           {/* ── Тест интеграций ─────────────────────────────────────────────── */}
+          {activeTab === "comms" && (
           <Card title="Интеграции">
             <IntegrationTestCard />
           </Card>
+          )}
 
           {/* ── Массовая рассылка ──────────────────────────────────────────── */}
+          {activeTab === "comms" && (
           <Card title="Рассылка">
             <MassEmailCard />
           </Card>
+          )}
 
           {/* ── Вход от лица ────────────────────────────────────────────────── */}
+          {activeTab === "people" && (
           <Card title="Вход от лица">
             <ImpersonationCard users={data.users} />
           </Card>
-
-          {/* ── Активные сессии ─────────────────────────────────────────────── */}
-          <Card title="Сессии">
-            <SessionsCard sessions={data.sessions} />
-          </Card>
+          )}
 
           {/* ── Live Logs ───────────────────────────────────────────────────── */}
+          {activeTab === "logs" && (
           <Card title="Логи">
             <LiveLogsCard />
           </Card>
+          )}
 
           {/* ── System Monitor (live) ──────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="Мониторинг (live)">
             <SystemMonitorCard />
           </Card>
+          )}
 
           {/* ── Audit Log ──────────────────────────────────────────────────── */}
+          {activeTab === "logs" && (
           <Card title="Аудит-лог админов">
             <AuditLogCard logs={data.auditLogs} />
           </Card>
+          )}
 
           {/* ── Quick User Actions ─────────────────────────────────────────── */}
+          {activeTab === "people" && (
           <Card title="Быстрые действия по пользователю">
             <UserActionsCard users={data.users} />
           </Card>
+          )}
 
           {/* ── Registration Analytics ──────────────────────────────────────── */}
+          {activeTab === "people" && (
           <Card title="Регистрации · 30 дней">
             <RegistrationAnalyticsCard data={data} />
           </Card>
+          )}
 
           {/* ── Database Health ─────────────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="Здоровье БД">
             <DbHealthCard dbHealth={data.dbHealth} />
           </Card>
+          )}
 
           {/* ── Feature Flags ─────────────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="Feature Flags">
             <FeatureFlagsCard />
           </Card>
+          )}
 
           {/* ── Email Queue ───────────────────────────────────────────────── */}
+          {activeTab === "comms" && (
           <Card title="Очередь писем">
             <EmailQueueCard />
           </Card>
+          )}
 
           {/* ── DB Backup ─────────────────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="Бэкап БД">
             <DbBackupCard />
           </Card>
+          )}
 
           {/* ── Admin Profiles ───────────────────────────────────────────── */}
+          {activeTab === "people" && (
           <Card title="Профили администраторов">
             <AdminProfilesCard profiles={data.adminProfiles} />
           </Card>
+          )}
 
           {/* ── Activity Heatmap ────────────────────────────────────────── */}
+          {activeTab === "jury" && (
           <Card title="Активность за год">
             <HeatmapCard data={data.heatmapData} />
           </Card>
+          )}
 
           {/* ── Jury Charts ─────────────────────────────────────────────── */}
+          {activeTab === "jury" && (
           <Card title="Нагрузка и оценки жюри">
             <JuryChartsCard data={data.juryChartsData} />
           </Card>
+          )}
 
           {/* ── SSL Monitor ─────────────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="SSL-сертификат">
             <SSLMonitorCard />
           </Card>
+          )}
 
           {/* ── DB Schema Visual ──────────────────────────────────────────── */}
+          {activeTab === "system" && (
           <Card title="Структура БД · ERD">
             <DatabaseSchemaViewer tables={data.dbHealth?.tables} />
           </Card>
+          )}
         </div>
       </div>
 
