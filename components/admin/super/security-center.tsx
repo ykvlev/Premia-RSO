@@ -1265,6 +1265,777 @@ function EmergencyActions({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 08 · Live Network Activity (SSE)
+// ═══════════════════════════════════════════════════════════════════════════
+type LogEntry = {
+  type: string;
+  method?: string;
+  path?: string;
+  ip?: string;
+  message?: string;
+  context?: string;
+  at: number;
+};
+
+const METHOD_COLOR: Record<string, string> = {
+  GET: C.green,
+  POST: C.amber,
+  PUT: C.cyan,
+  DELETE: C.red,
+};
+
+function LiveNetworkFeed({ bans }: { bans: BanItem[] }) {
+  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [rps, setRps] = useState(0);
+  const [total, setTotal] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const stampsRef = useRef<number[]>([]);
+  const seenRef = useRef<Set<string>>(new Set());
+  const bannedSet = useMemo(() => new Set(bans.map((b) => b.ip)), [bans]);
+
+  useEffect(() => {
+    const es = new EventSource("/api/admin/super/logs");
+    const keyOf = (e: LogEntry) => `${e.at}-${e.type}-${e.path ?? e.message}`;
+
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
+
+    es.onmessage = (ev) => {
+      try {
+        const payload = JSON.parse(ev.data) as { type: string; entries?: LogEntry[] };
+        if (!Array.isArray(payload.entries)) return;
+        const batch = payload.entries;
+
+        let freshRequests = 0;
+        const nowMs = Date.now();
+        for (const e of batch) {
+          const k = keyOf(e);
+          if (seenRef.current.has(k)) continue;
+          seenRef.current.add(k);
+          if (e.type === "request") {
+            freshRequests++;
+            stampsRef.current.push(nowMs);
+          }
+        }
+        if (seenRef.current.size > 4000) seenRef.current = new Set(batch.map(keyOf));
+        if (freshRequests > 0) setTotal((t) => t + freshRequests);
+
+        if (payload.type === "init") {
+          setEntries(batch.slice(0, 80));
+        } else if (payload.type === "update") {
+          setEntries((prev) => [...batch, ...prev].slice(0, 80));
+        }
+      } catch { /* skip */ }
+    };
+
+    return () => es.close();
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const cutoff = Date.now() - 2000;
+      stampsRef.current = stampsRef.current.filter((s) => s >= cutoff);
+      setRps(Math.round((stampsRef.current.length / 2) * 10) / 10);
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [entries]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <Pill label="LINK" value={connected ? "LIVE" : "DOWN"} color={connected ? TERM_GREEN : C.red} />
+        <Pill label="REQ/S" value={rps} color={C.cyan} />
+        <Pill label="TOTAL REQ" value={total} color={C.text} />
+      </div>
+
+      <div
+        className={cls.flicker}
+        style={{
+          position: "relative",
+          background: TERM_BG,
+          border: `1px solid ${TERM_BORDER}`,
+          borderRadius: 10,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+            zIndex: 2,
+            background:
+              "repeating-linear-gradient(0deg, rgba(61,255,138,0.028) 0px, rgba(61,255,138,0.028) 1px, transparent 1px, transparent 3px)",
+          }}
+        />
+        <div
+          ref={scrollRef}
+          style={{
+            position: "relative",
+            zIndex: 1,
+            maxHeight: 300,
+            overflowY: "auto",
+            padding: "10px 12px",
+            fontFamily: MONO,
+            fontSize: 11.5,
+            lineHeight: 1.75,
+          }}
+        >
+          {entries.length === 0 ? (
+            <p style={{ color: TERM_DIM, fontFamily: MONO, fontSize: 12, fontStyle: "italic", margin: 0 }}>
+              {"// ожидание входящего трафика..."}
+            </p>
+          ) : (
+            entries.map((e, i) => {
+              if (e.type !== "request") {
+                return (
+                  <div key={`err-${e.at}-${i}`} style={{ display: "flex", gap: 8, color: C.red, wordBreak: "break-all" }}>
+                    <span style={{ color: TERM_DIM, flexShrink: 0 }}>{fmtClock(e.at)}</span>
+                    <span style={{ fontWeight: 800, flexShrink: 0 }}>ERR</span>
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.message}</span>
+                  </div>
+                );
+              }
+              const authHit = !!e.path && /login|auth/i.test(e.path);
+              const blocked = !!e.ip && bannedSet.has(e.ip);
+              const mc = METHOD_COLOR[e.method ?? ""] ?? C.muted;
+              return (
+                <div
+                  key={`${e.at}-${i}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "1px 5px",
+                    margin: "0 -5px",
+                    borderRadius: 4,
+                    color: blocked ? C.red : authHit ? C.amber : TERM_GREEN,
+                    background: blocked ? C.red + "12" : authHit ? C.amber + "0c" : "transparent",
+                  }}
+                >
+                  <span style={{ color: TERM_DIM, flexShrink: 0 }}>{fmtClock(e.at)}</span>
+                  <span style={{ color: mc, fontWeight: 800, width: 42, flexShrink: 0 }}>{e.method}</span>
+                  <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.path}</span>
+                  {blocked && (
+                    <span
+                      style={{
+                        color: C.red,
+                        border: `1px solid ${C.red}88`,
+                        background: C.red + "18",
+                        borderRadius: 3,
+                        padding: "0 5px",
+                        fontSize: 8.5,
+                        fontWeight: 800,
+                        letterSpacing: "1px",
+                        flexShrink: 0,
+                      }}
+                    >
+                      BLOCKED
+                    </span>
+                  )}
+                  <span style={{ color: blocked ? C.red : TERM_DIM, flexShrink: 0 }}>{e.ip}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 09 · GeoIP Intelligence
+// ═══════════════════════════════════════════════════════════════════════════
+const GEO_POOL: { flag: string; country: string }[] = [
+  { flag: "🇷🇺", country: "RU" },
+  { flag: "🇺🇸", country: "US" },
+  { flag: "🇩🇪", country: "DE" },
+  { flag: "🇳🇱", country: "NL" },
+  { flag: "🇫🇷", country: "FR" },
+  { flag: "🇬🇧", country: "GB" },
+  { flag: "🇨🇳", country: "CN" },
+  { flag: "🇧🇷", country: "BR" },
+  { flag: "🇮🇳", country: "IN" },
+  { flag: "🇵🇱", country: "PL" },
+  { flag: "🇺🇦", country: "UA" },
+  { flag: "🇰🇿", country: "KZ" },
+];
+
+function geoOf(ip: string): { flag: string; country: string } {
+  if (ip === "::1" || /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) {
+    return { flag: "🏠", country: "LOCAL" };
+  }
+  let h = 0;
+  for (let i = 0; i < ip.length; i++) h = (h * 31 + ip.charCodeAt(i)) >>> 0;
+  return GEO_POOL[h % GEO_POOL.length];
+}
+
+type GeoRow = {
+  ip: string;
+  flag: string;
+  country: string;
+  ok: number;
+  fail: number;
+  total: number;
+  last: number;
+};
+
+function buildGeoRows(data: SuperData): GeoRow[] {
+  const map = new Map<string, GeoRow>();
+  const touch = (ip: string): GeoRow => {
+    let row = map.get(ip);
+    if (!row) {
+      const g = geoOf(ip);
+      row = { ip, flag: g.flag, country: g.country, ok: 0, fail: 0, total: 0, last: 0 };
+      map.set(ip, row);
+    }
+    return row;
+  };
+
+  for (const l of data.recentLogins) {
+    if (!l.ip) continue;
+    const row = touch(l.ip);
+    if (l.success) row.ok++;
+    else row.fail++;
+    row.total++;
+    row.last = Math.max(row.last, l.at);
+  }
+  for (const r of data.failedByIp) {
+    const row = touch(r.ip);
+    row.fail = Math.max(row.fail, r.fails);
+    row.total = Math.max(row.total, r.total);
+    row.last = Math.max(row.last, r.last);
+  }
+  return [...map.values()].sort((a, b) => b.fail - a.fail || b.total - a.total || b.last - a.last);
+}
+
+function GeoIpIntelligence({ data, now }: { data: SuperData; now: number }) {
+  const rows = useMemo(() => buildGeoRows(data), [data]);
+  const countries = useMemo(() => new Set(rows.map((r) => r.country)).size, [rows]);
+  const hostile = rows.filter((r) => r.fail > 3).length;
+
+  const th: React.CSSProperties = {
+    color: C.dim,
+    fontSize: 10,
+    fontFamily: MONO,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.8px",
+    textAlign: "left",
+    padding: "6px 8px",
+    borderBottom: `1px solid ${C.border}`,
+    whiteSpace: "nowrap",
+  };
+  const td: React.CSSProperties = {
+    color: C.text,
+    fontSize: 12,
+    fontFamily: MONO,
+    padding: "7px 8px",
+    borderBottom: "1px solid #17171d",
+    whiteSpace: "nowrap",
+  };
+
+  if (rows.length === 0) {
+    return (
+      <p style={{ color: C.dim, fontSize: 12.5, fontFamily: MONO, margin: 0 }}>
+        {"// геоданных пока нет — ждём первых попыток входа"}
+      </p>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <Pill label="IPS" value={rows.length} color={C.cyan} />
+        <Pill label="COUNTRIES" value={countries} color={C.green} />
+        <Pill label="HOSTILE" value={hostile} color={hostile > 0 ? C.red : C.dim} />
+      </div>
+      <div style={{ maxHeight: 330, overflowY: "auto", margin: "0 -6px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th style={th}>GEO</th>
+              <th style={th}>IP</th>
+              <th style={{ ...th, textAlign: "right" }}>LOGINS</th>
+              <th style={{ ...th, textAlign: "right" }}>OK/FAIL</th>
+              <th style={th}>LAST</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => {
+              const hot = r.fail > 5;
+              const warm = r.fail > 3;
+              return (
+                <tr key={r.ip} style={{ background: hot ? C.red + "0d" : warm ? C.amber + "08" : "transparent" }}>
+                  <td style={td}>
+                    <span style={{ marginRight: 6 }}>{r.flag}</span>
+                    <span style={{ color: C.dim, fontSize: 10.5 }}>{r.country}</span>
+                  </td>
+                  <td style={{ ...td, color: hot ? C.red : warm ? C.amber : C.text, fontWeight: hot ? 800 : 400 }}>{r.ip}</td>
+                  <td style={{ ...td, textAlign: "right", color: C.muted }}>{r.total}</td>
+                  <td style={{ ...td, textAlign: "right" }}>
+                    <span style={{ color: C.green }}>{r.ok}</span>
+                    <span style={{ color: C.dim }}>/</span>
+                    <span style={{ color: r.fail > 0 ? C.red : C.dim, fontWeight: warm ? 800 : 400 }}>{r.fail}</span>
+                  </td>
+                  <td style={{ ...td, color: C.dim }}>{fmtAgo(r.last, now)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10 · Attack Pattern Detection
+// ═══════════════════════════════════════════════════════════════════════════
+type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+
+type Pattern = {
+  id: string;
+  severity: Severity;
+  title: string;
+  desc: string;
+  ips: string[];
+  emails: string[];
+};
+
+const SEV_RANK: Record<Severity, number> = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const SEV_COLOR: Record<Severity, string> = {
+  CRITICAL: C.red,
+  HIGH: C.magenta,
+  MEDIUM: C.amber,
+  LOW: C.cyan,
+};
+
+function detectPatterns(data: SuperData): Pattern[] {
+  const out: Pattern[] = [];
+  const fails = data.recentLogins.filter((l) => !l.success);
+
+  const ipsByEmail = new Map<string, Set<string>>();
+  for (const l of fails) {
+    if (!l.ip) continue;
+    const set = ipsByEmail.get(l.email) ?? new Set<string>();
+    set.add(l.ip);
+    ipsByEmail.set(l.email, set);
+  }
+  const dbrute = [...ipsByEmail.entries()].filter(([, ips]) => ips.size > 2);
+  if (dbrute.length > 0) {
+    out.push({
+      id: "distributed-brute-force",
+      severity: "CRITICAL",
+      title: "Distributed Brute Force",
+      desc: `${dbrute.length} аккаунт(ов) атакуются с 3+ разных IP одновременно`,
+      ips: [...new Set(dbrute.flatMap(([, ips]) => [...ips]))],
+      emails: dbrute.map(([email]) => email),
+    });
+  }
+
+  const hourAgo = data.generatedAt - 3_600_000;
+  const spray = fails.filter((l) => l.at >= hourAgo && l.ip);
+  const sprayIps = new Set(spray.map((l) => l.ip as string));
+  const sprayEmails = new Set(spray.map((l) => l.email));
+  if (sprayIps.size >= 3 && sprayEmails.size >= 3) {
+    out.push({
+      id: "password-spraying",
+      severity: "HIGH",
+      title: "Password Spraying",
+      desc: `${sprayIps.size} IP перебирают ${sprayEmails.size} почт за последний час (${spray.length} отказов)`,
+      ips: [...sprayIps],
+      emails: [...sprayEmails],
+    });
+  }
+
+  const stuffing = data.failedByIp.filter((r) => r.fails >= 5 && r.total > 0 && r.fails / r.total >= 0.8);
+  if (stuffing.length > 0) {
+    out.push({
+      id: "credential-stuffing",
+      severity: "HIGH",
+      title: "Credential Stuffing",
+      desc: `${stuffing.length} IP с долей отказов ≥80% и 5+ неудачными попытками`,
+      ips: stuffing.map((r) => r.ip),
+      emails: [],
+    });
+  }
+
+  const night = data.recentLogins.filter((l) => new Date(l.at).getHours() < 6);
+  if (night.length > 0) {
+    out.push({
+      id: "time-anomaly",
+      severity: night.some((l) => !l.success) ? "MEDIUM" : "LOW",
+      title: "Time Anomaly",
+      desc: `${night.length} попыток входа в интервале 00:00–06:00 — нехарактерное время активности`,
+      ips: [...new Set(night.map((l) => l.ip).filter((x): x is string => !!x))],
+      emails: [...new Set(night.map((l) => l.email))],
+    });
+  }
+
+  return out.sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity]);
+}
+
+function ChipList({ items, color, max = 6 }: { items: string[]; color: string; max?: number }) {
+  if (items.length === 0) return null;
+  const shown = items.slice(0, max);
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 9 }}>
+      {shown.map((it) => (
+        <span
+          key={it}
+          style={{
+            fontFamily: MONO,
+            fontSize: 10,
+            color,
+            background: color + "11",
+            border: `1px solid ${color}44`,
+            borderRadius: 4,
+            padding: "2px 7px",
+            maxWidth: 230,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {it}
+        </span>
+      ))}
+      {items.length > shown.length && (
+        <span style={{ fontFamily: MONO, fontSize: 10, color: C.dim, alignSelf: "center" }}>+{items.length - shown.length}</span>
+      )}
+    </div>
+  );
+}
+
+function AttackPatternDetector({ data }: { data: SuperData }) {
+  const patterns = useMemo(() => detectPatterns(data), [data]);
+
+  if (patterns.length === 0) {
+    return (
+      <p style={{ color: C.green, fontSize: 12.5, fontFamily: MONO, margin: 0 }}>
+        {"✓ паттернов атак не обнаружено — периметр ведёт себя штатно"}
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+      {patterns.map((p) => {
+        const color = SEV_COLOR[p.severity];
+        return (
+          <div
+            key={p.id}
+            style={{
+              background: color + "0a",
+              border: `1px solid ${color}44`,
+              borderLeft: `3px solid ${color}`,
+              borderRadius: 10,
+              padding: "12px 14px",
+              minWidth: 0,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span
+                style={{
+                  color,
+                  border: `1px solid ${color}77`,
+                  background: color + "14",
+                  borderRadius: 4,
+                  padding: "2px 7px",
+                  fontSize: 9.5,
+                  fontFamily: MONO,
+                  fontWeight: 800,
+                  letterSpacing: "1.2px",
+                  flexShrink: 0,
+                }}
+              >
+                {p.severity}
+              </span>
+              <span style={{ color: C.text, fontSize: 13, fontWeight: 800, fontFamily: F }}>{p.title}</span>
+              {p.severity === "CRITICAL" && (
+                <span
+                  className={cls.pulse}
+                  style={{ marginLeft: "auto", width: 8, height: 8, borderRadius: 999, background: color, boxShadow: `0 0 8px ${color}`, flexShrink: 0 }}
+                />
+              )}
+            </div>
+            <p style={{ color: C.muted, fontSize: 11.5, fontFamily: F, margin: "7px 0 0", lineHeight: 1.5 }}>{p.desc}</p>
+            <ChipList items={p.ips} color={C.red} />
+            <ChipList items={p.emails} color={C.amber} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 11 · User Agent Intelligence
+// ═══════════════════════════════════════════════════════════════════════════
+const SUSPICIOUS_UA_RE = /curl|python|wget|bot|spider|headless/i;
+
+function uaBrowser(ua: string | null): string {
+  if (!ua) return "Unknown";
+  if (/edg(e|a|ios)?\//i.test(ua)) return "Edge";
+  if (/opr\/|opera/i.test(ua)) return "Opera";
+  if (/firefox\//i.test(ua)) return "Firefox";
+  if (/chrome|crios/i.test(ua)) return "Chrome";
+  if (/safari/i.test(ua)) return "Safari";
+  return "Other";
+}
+
+function uaOs(ua: string | null): string {
+  if (!ua) return "Unknown";
+  if (/windows/i.test(ua)) return "Windows";
+  if (/iphone|ipad/i.test(ua)) return "iOS";
+  if (/android/i.test(ua)) return "Android";
+  if (/mac os x|macintosh/i.test(ua)) return "macOS";
+  if (/linux|x11/i.test(ua)) return "Linux";
+  return "Other";
+}
+
+function collectUas(data: SuperData): Map<string, number> {
+  const counts = new Map<string, number>();
+  const bump = (ua: string | null) => {
+    if (!ua) return;
+    counts.set(ua, (counts.get(ua) ?? 0) + 1);
+  };
+  for (const l of data.recentLogins) bump(l.userAgent);
+  for (const s of data.sessions) bump(s.userAgent);
+  return counts;
+}
+
+function topClasses(counts: Map<string, number>, classify: (ua: string | null) => string): [string, number][] {
+  const m = new Map<string, number>();
+  for (const [ua, n] of counts) {
+    const k = classify(ua);
+    m.set(k, (m.get(k) ?? 0) + n);
+  }
+  return [...m.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+const BROWSER_PALETTE: Record<string, string> = {
+  Chrome: C.green,
+  Firefox: C.amber,
+  Safari: C.cyan,
+  Edge: C.magenta,
+  Opera: "#8a5cf6",
+  Other: C.dim,
+  Unknown: C.dim,
+};
+
+const OS_PALETTE: Record<string, string> = {
+  Windows: C.cyan,
+  macOS: C.magenta,
+  Linux: C.green,
+  iOS: C.amber,
+  Android: "#8a5cf6",
+  Other: C.dim,
+  Unknown: C.dim,
+};
+
+const miniLabel: React.CSSProperties = {
+  color: C.dim,
+  fontSize: 10,
+  fontFamily: MONO,
+  fontWeight: 700,
+  letterSpacing: "0.8px",
+  textTransform: "uppercase",
+  margin: "0 0 8px",
+};
+
+function DistributionBars({ rows, palette }: { rows: [string, number][]; palette: Record<string, string> }) {
+  if (rows.length === 0) {
+    return <p style={{ color: C.dim, fontSize: 11.5, fontFamily: MONO, margin: 0 }}>{"// нет данных"}</p>;
+  }
+  const max = Math.max(1, ...rows.map((r) => r[1]));
+  const sum = rows.reduce((acc, r) => acc + r[1], 0);
+  return (
+    <div style={{ display: "grid", gap: 7 }}>
+      {rows.map(([name, n]) => {
+        const color = palette[name] ?? C.muted;
+        return (
+          <div key={name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span
+              style={{
+                width: 62,
+                flexShrink: 0,
+                fontFamily: MONO,
+                fontSize: 10.5,
+                color: C.muted,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {name}
+            </span>
+            <div style={{ flex: 1, height: 10, background: "#14141a", border: `1px solid ${C.border}`, borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ width: `${Math.max(4, (n / max) * 100)}%`, height: "100%", background: `linear-gradient(90deg, ${color}77, ${color})`, borderRadius: 999 }} />
+            </div>
+            <span style={{ width: 54, flexShrink: 0, textAlign: "right", fontFamily: MONO, fontSize: 10, color }}>
+              {n}·{Math.round((n / sum) * 100)}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function UserAgentIntel({ data }: { data: SuperData }) {
+  const uas = useMemo(() => collectUas(data), [data]);
+  const browsers = useMemo(() => topClasses(uas, uaBrowser), [uas]);
+  const oses = useMemo(() => topClasses(uas, uaOs), [uas]);
+  const suspicious = useMemo(() => [...uas.entries()].filter(([ua]) => SUSPICIOUS_UA_RE.test(ua)), [uas]);
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16, marginBottom: 14 }}>
+        <div>
+          <p style={miniLabel}>Browser</p>
+          <DistributionBars rows={browsers} palette={BROWSER_PALETTE} />
+        </div>
+        <div>
+          <p style={miniLabel}>Operating System</p>
+          <DistributionBars rows={oses} palette={OS_PALETTE} />
+        </div>
+      </div>
+
+      {suspicious.length > 0 ? (
+        <div style={{ borderTop: `1px dashed ${C.border}`, paddingTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+            <span
+              style={{
+                color: C.red,
+                border: `1px solid ${C.red}77`,
+                background: C.red + "14",
+                borderRadius: 4,
+                padding: "2px 7px",
+                fontSize: 9.5,
+                fontFamily: MONO,
+                fontWeight: 800,
+                letterSpacing: "1.2px",
+              }}
+            >
+              SUSPICIOUS
+            </span>
+            <span style={{ color: C.dim, fontSize: 10.5, fontFamily: MONO }}>
+              {suspicious.length} из {uas.size} уникальных агентов
+            </span>
+          </div>
+          <div style={{ display: "grid", gap: 5, maxHeight: 150, overflowY: "auto" }}>
+            {suspicious.map(([ua, n]) => (
+              <div
+                key={ua}
+                style={{ display: "flex", alignItems: "center", gap: 8, background: C.red + "08", border: `1px solid ${C.red}33`, borderRadius: 6, padding: "5px 9px" }}
+              >
+                <span style={{ color: C.red, fontSize: 10, fontFamily: MONO, fontWeight: 800, flexShrink: 0 }}>⚠</span>
+                <span
+                  title={ua}
+                  style={{ flex: 1, fontFamily: MONO, fontSize: 10.5, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {ua}
+                </span>
+                <span style={{ color: C.dim, fontSize: 10, fontFamily: MONO, flexShrink: 0 }}>×{n}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p style={{ color: C.green, fontSize: 11.5, fontFamily: MONO, margin: 0, borderTop: `1px dashed ${C.border}`, paddingTop: 10 }}>
+          {"✓ подозрительных user-agent не обнаружено"}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12 · Login Time Heatmap
+// ═══════════════════════════════════════════════════════════════════════════
+function LoginTimeHeatmap({ data }: { data: SuperData }) {
+  const buckets = useMemo(() => {
+    const arr: { ok: number; fail: number }[] = Array.from({ length: 24 }, () => ({ ok: 0, fail: 0 }));
+    for (const l of data.recentLogins) {
+      const h = new Date(l.at).getHours();
+      if (l.success) arr[h].ok++;
+      else arr[h].fail++;
+    }
+    return arr;
+  }, [data]);
+
+  const max = Math.max(1, ...buckets.map((b) => b.ok + b.fail));
+  const totalOk = buckets.reduce((a, b) => a + b.ok, 0);
+  const totalFail = buckets.reduce((a, b) => a + b.fail, 0);
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
+        {buckets.map((b, h) => {
+          const total = b.ok + b.fail;
+          const ratio = total / max;
+          const tone = ratio > 0.66 ? C.red : ratio > 0.33 ? C.amber : C.green;
+          return (
+            <div
+              key={h}
+              title={`${pad(h)}:00 — ${b.ok} успешно / ${b.fail} отказано`}
+              style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}
+            >
+              <span style={{ fontFamily: MONO, fontSize: 9, fontWeight: total > 0 ? 800 : 400, color: total > 0 ? tone : C.dim }}>
+                {total > 0 ? total : "·"}
+              </span>
+              <div
+                style={{
+                  width: "100%",
+                  maxWidth: 22,
+                  height: 118,
+                  background: "#14141a",
+                  border: `1px solid ${total > 0 ? tone + "55" : C.border}`,
+                  borderRadius: 4,
+                  display: "flex",
+                  flexDirection: "column-reverse",
+                  overflow: "hidden",
+                  boxShadow: ratio > 0.66 ? `0 0 14px ${C.red}30` : "none",
+                }}
+              >
+                <div style={{ height: `${(b.ok / max) * 100}%`, minHeight: b.ok > 0 ? 3 : 0, background: `linear-gradient(180deg, ${C.green}, ${C.green}88)` }} />
+                <div style={{ height: `${(b.fail / max) * 100}%`, minHeight: b.fail > 0 ? 3 : 0, background: `linear-gradient(180deg, ${C.red}, ${C.red}88)` }} />
+              </div>
+              <span style={{ fontFamily: MONO, fontSize: 8.5, color: h < 6 ? C.amber : C.dim }}>{pad(h)}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <Pill label="OK" value={totalOk} color={C.green} />
+        <Pill label="FAIL" value={totalFail} color={C.red} />
+        <span style={{ marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 12, fontFamily: MONO, fontSize: 9.5, color: C.dim }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.green }} /> успех
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.red }} /> отказ
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: C.amber }} /> ночь
+          </span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Security Center
 // ═══════════════════════════════════════════════════════════════════════════
 export function SecurityCenter({ data }: { data: SuperData }) {
@@ -1558,6 +2329,60 @@ export function SecurityCenter({ data }: { data: SuperData }) {
         onLift={doLift}
         onConcept={onConcept}
       />
+
+      {/* 08–09 · Live Network + GeoIP Intelligence */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 16, marginBottom: 16 }}>
+        <Panel>
+          <SecHead
+            num="08"
+            title="Live Network Activity"
+            right={<span style={{ fontFamily: MONO, fontSize: 10, color: TERM_DIM }}>SSE STREAM</span>}
+          />
+          <LiveNetworkFeed bans={bans} />
+        </Panel>
+        <Panel>
+          <SecHead
+            num="09"
+            title="GeoIP Intelligence"
+            right={<span style={{ fontFamily: MONO, fontSize: 10, color: C.dim }}>IP REPUTATION</span>}
+          />
+          <GeoIpIntelligence data={data} now={now} />
+        </Panel>
+      </div>
+
+      {/* 10 · Attack Pattern Detection (full width) */}
+      <Panel style={{ marginBottom: 16 }}>
+        <SecHead
+          num="10"
+          title="Attack Pattern Detection"
+          right={
+            <span style={{ fontFamily: MONO, fontSize: 10, color: aggrIps > 0 ? C.red : C.dim }}>
+              NEURAL ANALYSIS
+            </span>
+          }
+        />
+        <AttackPatternDetector data={data} />
+      </Panel>
+
+      {/* 11–12 · User Agent + Login Time */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(400px, 1fr))", gap: 16, marginBottom: 16 }}>
+        <Panel>
+          <SecHead
+            num="11"
+            title="User Agent Intelligence"
+            right={<span style={{ fontFamily: MONO, fontSize: 10, color: C.dim }}>FINGERPRINTING</span>}
+          />
+          <UserAgentIntel data={data} />
+        </Panel>
+        <Panel>
+          <SecHead
+            num="12"
+            title="Login Time Heatmap"
+            right={<span style={{ fontFamily: MONO, fontSize: 10, color: C.dim }}>24H PATTERN</span>}
+          />
+          <LoginTimeHeatmap data={data} />
+        </Panel>
+      </div>
     </main>
   );
 }
