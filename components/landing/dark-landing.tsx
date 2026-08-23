@@ -23,6 +23,7 @@ import VectorD from "./imports/Vector-3/index";
 import Rso from "./imports/rso/index";
 import VectorE from "./imports/Vector-4/index";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { PwaInstallButton } from "@/components/pwa-install";
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -512,6 +513,7 @@ function Header({
 }) {
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
+  const [lang, setLang] = useState<"RU" | "EN">("RU");
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", fn);
@@ -550,6 +552,8 @@ function Header({
           ))}
         </nav>
         <div className="flex items-center gap-3">
+          <PwaInstallButton />
+          <button onClick={() => setLang((v) => (v === "RU" ? "EN" : "RU"))} style={{ background: "transparent", border: "1px solid #2a2a32", color: "#9a9aa4", fontSize: 12, fontFamily: "var(--font-onest), sans-serif", fontWeight: 700, borderRadius: 999, padding: "8px 12px", cursor: "pointer" }}>{lang}</button>
           <ThemeToggle />
           <button
             onClick={() => router.push("/login")}
@@ -2491,6 +2495,7 @@ function ContactsSection() {
                   </a>
                 ))}
               </div>
+              <SubscribeForm />
             </div>
             <div>
               <p
@@ -2575,6 +2580,26 @@ function PartnersSection() {
         })}
       </div>
     </section>
+  );
+}
+
+// ─── Subscribe ────────────────────────────────────────────────────────────────
+
+function SubscribeForm() {
+  const [email, setEmail] = useState("");
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async () => {
+    setErr("");
+    const r = await fetch("/api/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+    if (r.ok) setDone(true); else setErr("Проверьте email");
+  };
+  if (done) return <p style={{ color: "#2fbf6b", fontSize: 13, fontFamily: "var(--font-onest), sans-serif", fontWeight: 600 }}>Спасибо! Подписка оформлена.</p>;
+  return (
+    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+      <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Ваш email" style={{ flex: 1, background: "#0d0d12", border: `1px solid ${err ? "#ff6b6b" : "#2a2a32"}`, borderRadius: 999, color: "#f2f0ec", fontSize: 13, fontFamily: "var(--font-onest), sans-serif", padding: "10px 16px", outline: "none" }} />
+      <button onClick={submit} style={{ background: "#0804ff", color: "#fff", fontSize: 13, fontFamily: "var(--font-onest), sans-serif", fontWeight: 600, border: "none", borderRadius: 999, padding: "10px 18px", cursor: "pointer" }}>Подписаться</button>
+    </div>
   );
 }
 
