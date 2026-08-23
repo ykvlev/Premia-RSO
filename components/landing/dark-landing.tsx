@@ -535,12 +535,20 @@ function Header({
       <div className="lp-header flex items-center justify-between px-12 py-4">
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center" }} aria-label="Наверх"><Logo size={120} /></button>
         <nav className="lp-nav flex items-center gap-7">
-          {[
-            { label: "О премии", action: () => scroll(aboutRef) },
-            { label: "Номинации", action: () => scroll(nominationsRef) },
-            { label: "Этапы", action: () => scroll(stagesRef) },
-            { label: "Контакты", action: () => scroll(contactsRef) },
-          ].map((item) => (
+          {(lang === "RU"
+            ? [
+                { label: "О премии", action: () => scroll(aboutRef) },
+                { label: "Номинации", action: () => scroll(nominationsRef) },
+                { label: "Этапы", action: () => scroll(stagesRef) },
+                { label: "Контакты", action: () => scroll(contactsRef) },
+              ]
+            : [
+                { label: "About", action: () => scroll(aboutRef) },
+                { label: "Nominations", action: () => scroll(nominationsRef) },
+                { label: "Stages", action: () => scroll(stagesRef) },
+                { label: "Contacts", action: () => scroll(contactsRef) },
+              ]
+          ).map((item) => (
             <button
               key={item.label}
               onClick={item.action}
@@ -560,14 +568,14 @@ function Header({
             className="hdr-login cursor-pointer rounded-full border border-[#2a2a32] bg-transparent px-5 py-3 text-[15px] font-medium text-[#f2f0ec] transition-all duration-200 hover:border-[#4a4a56]"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
-            Войти
+            {lang === "RU" ? "Войти" : "Login"}
           </button>
           <button
             onClick={() => router.push("/register")}
             className="cursor-pointer rounded-full border-0 bg-[#0804ff] px-6 py-3 text-[15px] font-medium text-white transition-all duration-200 hover:scale-105 hover:bg-[#0a06ff] active:scale-95"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
-            Регистрация
+            {lang === "RU" ? "Регистрация" : "Sign up"}
           </button>
         </div>
       </div>
