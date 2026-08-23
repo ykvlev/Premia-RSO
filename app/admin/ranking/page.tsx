@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import { RankingBoard, type RankNomination } from "@/components/admin/ranking-board";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Итоговый рейтинг" };
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export default async function RankingPage() {
   await requireRole("admin", "superadmin");
 
   const noms = await db.nomination.findMany({
-    select: { id: true, title: true },
+    select: { id: true, title: true, criteria: true },
     orderBy: { title: "asc" },
   });
 
@@ -24,20 +25,18 @@ export default async function RankingPage() {
     },
   });
 
+  const criteriaByNom = new Map<string, ReturnType<typeof parseCriteria>>();
+  for (const n of noms) criteriaByNom.set(n.id, parseCriteria(n.criteria));
+
   const byNom = new Map<string, RankNomination>();
   for (const n of noms) byNom.set(n.id, { id: n.id, title: n.title, apps: [] });
 
   for (const a of rows) {
     const bucket = byNom.get(a.nominationId);
     if (!bucket) continue;
-    const totals = a.evaluations.map((e) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
-    const avg =
-      totals.length > 0
-        ? Math.round((totals.reduce((s, t) => s + t, 0) / totals.length) * 10) / 10
-        : null;
+    const criteria = criteriaByNom.get(a.nominationId) ?? parseCriteria([]);
+    const totals = a.evaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, criteria));
+    const avg = calcAvgTotal(totals);
     const p = (a.payload ?? {}) as Record<string, unknown>;
     const nominee =
       (typeof p.nomineeFio === "string" && p.nomineeFio) || a.contactFio || a.orgName;

@@ -55,15 +55,22 @@ type FieldInput = {
   required?: boolean;
   options?: string[];
 };
+type CriterionInput = {
+  key?: string;
+  label: string;
+  maxScore?: number;
+  weight?: number;
+  step?: number;
+};
 const FIELD_TYPES = ["text", "textarea", "number", "select", "url", "file"];
 
 /**
- * Редактор номинации: описание + официальные поля (formSchema). Только супер-админ.
+ * Редактор номинации: описание + критерии оценки + официальные поля (formSchema). Только супер-админ.
  * Название не меняем — форма подачи сопоставляет номинации по title.
  */
 export async function updateNomination(
   id: string,
-  data: { description: string; formSchema: FieldInput[] },
+  data: { description: string; formSchema: FieldInput[]; criteria?: CriterionInput[] },
 ): Promise<{ ok: boolean; error?: string }> {
   await requireRole("superadmin");
 
@@ -84,13 +91,43 @@ export async function updateNomination(
     clean.push(field);
   }
 
+  // валидация критериев
+  let criteriaPayload: object | undefined;
+  if (data.criteria !== undefined) {
+    if (data.criteria.length === 0) return { ok: false, error: "Нужен хотя бы один критерий оценки." };
+    if (data.criteria.length > 20) return { ok: false, error: "Слишком много критериев (макс 20)." };
+    const out: { key: string; label: string; maxScore: number; weight: number; step: number }[] = [];
+    for (let i = 0; i < data.criteria.length; i++) {
+      const c = data.criteria[i];
+      const label = (c.label || "").trim();
+      if (!label) return { ok: false, error: `Критерий ${i + 1}: нужна подпись.` };
+      if (label.length > 200) return { ok: false, error: `Критерий ${i + 1}: подпись слишком длинная.` };
+      const maxScore = Number(c.maxScore);
+      if (!Number.isFinite(maxScore) || maxScore < 1 || maxScore > 100)
+        return { ok: false, error: `Критерий ${i + 1}: макс. балл 1–100.` };
+      const weight = Number(c.weight);
+      if (!Number.isFinite(weight) || weight < 0.1 || weight > 5)
+        return { ok: false, error: `Критерий ${i + 1}: вес 0.1–5.` };
+      const step = Number(c.step);
+      if (![0.1, 0.5, 1].includes(step)) return { ok: false, error: `Критерий ${i + 1}: шаг — 0.1, 0.5 или 1.` };
+      out.push({ key: (c.key || `c${i + 1}`).trim() || `c${i + 1}`, label, maxScore, weight, step });
+    }
+    // уникальность key
+    const keys = out.map((c) => c.key);
+    if (new Set(keys).size !== keys.length) {
+      // перегенерим ключи если дубли
+      out.forEach((c, idx) => (c.key = `c${idx + 1}`));
+    }
+    criteriaPayload = out as object;
+  }
+
   try {
-    await db.nomination.update({
-      where: { id },
-      data: { description: data.description.trim(), formSchema: clean as object },
-    });
+    const updateData: Record<string, unknown> = { description: data.description.trim(), formSchema: clean as object };
+    if (criteriaPayload !== undefined) updateData.criteria = criteriaPayload;
+    await db.nomination.update({ where: { id }, data: updateData });
     revalidatePath("/admin/super/nominations");
     revalidatePath("/apply");
+    revalidatePath("/jury");
     return { ok: true };
   } catch (e) {
     recordError(e, "updateNomination");

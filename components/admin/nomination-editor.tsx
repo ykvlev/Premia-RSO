@@ -10,12 +10,20 @@ type Field = {
   required?: boolean;
   options?: string[];
 };
+type Criterion = {
+  key: string;
+  label: string;
+  maxScore: number;
+  weight: number;
+  step: number;
+};
 export type NomData = {
   id: string;
   title: string;
   participantType: string;
   description: string;
   formSchema: Field[];
+  criteria: Criterion[];
 };
 
 const F = "var(--font-onest), sans-serif";
@@ -60,6 +68,9 @@ function NominationRow({ nom }: { nom: NomData }) {
   const [open, setOpen] = useState(false);
   const [desc, setDesc] = useState(nom.description);
   const [fields, setFields] = useState<Field[]>(nom.formSchema.map((f) => ({ ...f })));
+  const [criteria, setCriteria] = useState<Criterion[]>(() =>
+    nom.criteria.length > 0 ? nom.criteria.map((c) => ({ ...c })) : [{ key: "c1", label: "", maxScore: 10, weight: 1, step: 0.5 }],
+  );
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -77,10 +88,24 @@ function NominationRow({ nom }: { nom: NomData }) {
   const add = () =>
     setFields((fs) => [...fs, { name: `field${fs.length + 1}`, label: "", type: "text" }]);
 
+  const setCrit = (i: number, patch: Partial<Criterion>) =>
+    setCriteria((cs) => cs.map((c, j) => (j === i ? { ...c, ...patch } : c)));
+  const removeCrit = (i: number) => setCriteria((cs) => cs.filter((_, j) => j !== i));
+  const moveCrit = (i: number, dir: -1 | 1) =>
+    setCriteria((cs) => {
+      const j = i + dir;
+      if (j < 0 || j >= cs.length) return cs;
+      const c = [...cs];
+      [c[i], c[j]] = [c[j], c[i]];
+      return c.map((x, idx) => ({ ...x, key: `c${idx + 1}` }));
+    });
+  const addCrit = () =>
+    setCriteria((cs) => [...cs, { key: `c${cs.length + 1}`, label: "", maxScore: 10, weight: 1, step: 0.5 }]);
+
   const save = async () => {
     setSaving(true);
     setMsg(null);
-    const res = await updateNomination(nom.id, { description: desc, formSchema: fields });
+    const res = await updateNomination(nom.id, { description: desc, formSchema: fields, criteria });
     setSaving(false);
     setMsg(res.ok ? { ok: true, text: "Сохранено" } : { ok: false, text: res.error ?? "Ошибка" });
     if (res.ok) setTimeout(() => setMsg(null), 3000);
@@ -115,7 +140,7 @@ function NominationRow({ nom }: { nom: NomData }) {
             {nom.title}
           </p>
           <p style={{ color: "#6a6a72", fontSize: 12, fontFamily: F, margin: "3px 0 0" }}>
-            {nom.participantType} · {fields.length} полей
+            {nom.participantType} · {criteria.length} критериев · {fields.length} полей
           </p>
         </div>
         <span style={{ color: "#6a6a72", fontSize: 12 }}>{open ? "▲" : "▼"}</span>
@@ -132,6 +157,80 @@ function NominationRow({ nom }: { nom: NomData }) {
             rows={3}
             style={{ ...input, resize: "vertical", lineHeight: 1.5 }}
           />
+
+          <p style={{ color: "#9a9aa4", fontSize: 12, fontFamily: F, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", margin: "20px 0 10px" }}>
+            Критерии оценки жюри ({criteria.length}) — шаг 0.5, макс 10, вес
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+            {criteria.map((c, i) => (
+              <div
+                key={i}
+                style={{ background: "#0a0a0d", border: "1px solid #1e1e26", borderRadius: 10, padding: 10, display: "flex", gap: 8, alignItems: "center" }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                  <button onClick={() => moveCrit(i, -1)} title="Выше" style={arrow}>↑</button>
+                  <button onClick={() => moveCrit(i, 1)} title="Ниже" style={arrow}>↓</button>
+                </div>
+                <input
+                  value={c.label}
+                  onChange={(e) => setCrit(i, { label: e.target.value })}
+                  placeholder={`Критерий ${i + 1}`}
+                  style={{ ...input, flex: 1 }}
+                />
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <label style={{ color: "#6a6a72", fontSize: 11, fontFamily: F }}>Макс</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={c.maxScore}
+                    onChange={(e) => setCrit(i, { maxScore: Number(e.target.value) || 0 })}
+                    style={{ ...input, width: 64, fontFamily: MONO, fontSize: 12, padding: "6px 8px" }}
+                  />
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <label style={{ color: "#6a6a72", fontSize: 11, fontFamily: F }}>Вес</label>
+                  <input
+                    type="number"
+                    min={0.1}
+                    max={5}
+                    step={0.1}
+                    value={c.weight}
+                    onChange={(e) => setCrit(i, { weight: Number(e.target.value) || 1 })}
+                    style={{ ...input, width: 58, fontFamily: MONO, fontSize: 12, padding: "6px 8px" }}
+                  />
+                </div>
+                <select
+                  value={String(c.step)}
+                  onChange={(e) => setCrit(i, { step: Number(e.target.value) as 0.1 | 0.5 | 1 })}
+                  style={{ ...input, width: 72, fontSize: 12, padding: "6px 8px" }}
+                >
+                  <option value="0.1" style={{ background: "#121216" }}>шаг 0.1</option>
+                  <option value="0.5" style={{ background: "#121216" }}>шаг 0.5</option>
+                  <option value="1" style={{ background: "#121216" }}>шаг 1</option>
+                </select>
+                <button onClick={() => removeCrit(i)} title="Удалить критерий" style={{ ...arrow, color: "#ff6b6b", borderColor: "#ff6b6b44" }}>✕</button>
+              </div>
+            ))}
+          </div>
+          <button
+            onClick={addCrit}
+            style={{
+              background: "transparent",
+              border: "1px dashed #2b4cff66",
+              color: "#93a4ff",
+              borderRadius: 9,
+              padding: "7px 14px",
+              fontSize: 12.5,
+              fontFamily: F,
+              fontWeight: 600,
+              cursor: "pointer",
+              width: "100%",
+              marginBottom: 16,
+            }}
+          >
+            + Добавить критерий
+          </button>
 
           <p style={{ color: "#9a9aa4", fontSize: 12, fontFamily: F, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", margin: "20px 0 10px" }}>
             Официальные поля заявки ({fields.length})

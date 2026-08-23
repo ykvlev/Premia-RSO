@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import { brand } from "@/lib/brand";
 import { PrintButton } from "@/components/certificate/print-button";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Протокол итогов", robots: { index: false } };
 export const dynamic = "force-dynamic";
@@ -15,6 +16,10 @@ type NomGroup = { title: string; rows: Row[] };
 /** Печатный протокол подведения итогов (победители и финалисты по номинациям). */
 export default async function ProtocolPage() {
   await requireRole("admin", "superadmin");
+
+  const nominations = await db.nomination.findMany({ select: { id: true, criteria: true } });
+  const criteriaByNom = new Map<string, ReturnType<typeof parseCriteria>>();
+  for (const n of nominations) criteriaByNom.set(n.id, parseCriteria(n.criteria));
 
   const rows = await db.application.findMany({
     where: { status: { in: ["winner", "finalist"] } },
@@ -29,14 +34,9 @@ export default async function ProtocolPage() {
     if (!byNom.has(a.nomination.id)) {
       byNom.set(a.nomination.id, { title: a.nomination.title, rows: [] });
     }
-    const totals = a.evaluations.map((e) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
-    const avg =
-      totals.length > 0
-        ? Math.round((totals.reduce((s, t) => s + t, 0) / totals.length) * 10) / 10
-        : null;
+    const criteria = criteriaByNom.get(a.nomination.id) ?? parseCriteria([]);
+    const totals = a.evaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, criteria));
+    const avg = calcAvgTotal(totals);
     const p = (a.payload ?? {}) as Record<string, unknown>;
     const fio =
       (typeof p.nomineeFio === "string" && p.nomineeFio) || a.contactFio || a.orgName;

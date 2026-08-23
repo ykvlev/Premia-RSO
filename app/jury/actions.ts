@@ -121,16 +121,22 @@ export async function submitEvaluation(input: {
 
   const app = await db.application.findUnique({
     where: { id: input.applicationId },
-    select: { id: true },
+    select: { id: true, nomination: { select: { criteria: true } } },
   });
   if (!app) return { ok: false as const, error: "Заявка не найдена" };
 
-  // сохраняем только то, что разрешено правами
+  // сохраняем только то, что разрешено правами — с валидацией по критериям (0..max, шаг 0.5)
   const scores: Record<string, number> = {};
   if (perms.score) {
+    const { parseCriteria, clampScore } = await import("@/lib/scoring");
+    const criteria = parseCriteria(app.nomination.criteria);
+    const map = new Map(criteria.map((c) => [c.key, c]));
     for (const [k, v] of Object.entries(input.scores)) {
+      const c = map.get(k);
+      if (!c) continue; // неизвестный ключ — игнорим
       const n = Number(v);
-      scores[k] = Number.isFinite(n) ? n : 0;
+      if (!Number.isFinite(n)) continue;
+      scores[k] = clampScore(n, c.maxScore, c.step);
     }
   }
   const comment = perms.comment ? input.comment.trim() : "";

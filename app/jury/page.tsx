@@ -8,27 +8,17 @@ import {
   type Criterion,
   type JuryPerms,
 } from "@/components/jury/jury-board";
+import { parseCriteria as parseScoring } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Кабинет жюри" };
 export const dynamic = "force-dynamic";
 
 const F = "var(--font-onest), sans-serif";
 
-/** Критерии номинации из Json (защитно). Пусто → одна «Общая оценка» 0–100. */
+/** Критерии номинации из Json (защитно). Делегирует в lib/scoring. */
 function parseCriteria(raw: unknown): Criterion[] {
-  const arr = Array.isArray(raw) ? raw : [];
-  const out: Criterion[] = [];
-  for (const c of arr) {
-    if (c && typeof c === "object") {
-      const o = c as Record<string, unknown>;
-      const key = typeof o.key === "string" ? o.key : "";
-      const label = typeof o.label === "string" ? o.label : key;
-      const max = typeof o.maxScore === "number" ? o.maxScore : 100;
-      if (key) out.push({ key, label, max });
-    }
-  }
-  if (out.length === 0) out.push({ key: "overall", label: "Общая оценка", max: 100 });
-  return out;
+  const parsed = parseScoring(raw);
+  return parsed.map((c) => ({ key: c.key, label: c.label, max: c.maxScore, weight: c.weight, step: c.step }));
 }
 
 /** Кабинет жюри: заявки закреплённых номинаций + выставление баллов. */

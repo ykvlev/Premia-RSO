@@ -5,7 +5,7 @@ import { submitEvaluation, juryUpdateStatus, toggleRecusal } from "@/app/jury/ac
 
 const F = "var(--font-onest), sans-serif";
 
-export type Criterion = { key: string; label: string; max: number };
+export type Criterion = { key: string; label: string; max: number; weight?: number; step?: number };
 
 export type JuryPerms = {
   score: boolean;
@@ -75,11 +75,15 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
       if (r.recused) setSaved(false);
     }
   }
-  const total = item.criteria.reduce((s, c) => s + (scores[c.key] ?? 0), 0);
-  const maxTotal = item.criteria.reduce((s, c) => s + c.max, 0);
+  const total = item.criteria.reduce((s, c) => s + (scores[c.key] ?? 0) * (c.weight ?? 1), 0);
+  const maxTotal = item.criteria.reduce((s, c) => s + c.max * (c.weight ?? 1), 0);
 
-  function setScore(key: string, value: number, max: number) {
-    const v = Math.max(0, Math.min(max, Math.round(value)));
+  function setScore(key: string, value: number, max: number, step: number) {
+    const inv = 1 / step;
+    let v = Math.round(value * inv) / inv;
+    v = Math.max(0, Math.min(max, v));
+    const dec = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
+    v = Number(v.toFixed(dec));
     setScores((p) => ({ ...p, [key]: v }));
     setSaved(false);
   }
@@ -213,25 +217,32 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
       {/* Баллы */}
       {perms.score && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {item.criteria.map((c) => (
-            <div key={c.key}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-                <span style={{ color: "#c8c8d0", fontSize: 13, fontWeight: 600 }}>{c.label}</span>
-                <span style={{ color: "#9a9aa4", fontSize: 13, fontWeight: 700 }}>
-                  {scores[c.key] ?? 0} <span style={{ color: "#4a4a52", fontWeight: 500 }}>/ {c.max}</span>
-                </span>
+          {item.criteria.map((c) => {
+            const step = c.step ?? 0.5;
+            const weight = c.weight ?? 1;
+            return (
+              <div key={c.key}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                  <span style={{ color: "#c8c8d0", fontSize: 13, fontWeight: 600 }}>
+                    {c.label}
+                    {weight !== 1 && <span style={{ color: "#0804ff", fontSize: 11, marginLeft: 6 }}>×{weight}</span>}
+                  </span>
+                  <span style={{ color: "#9a9aa4", fontSize: 13, fontWeight: 700 }}>
+                    {scores[c.key] ?? 0} <span style={{ color: "#4a4a52", fontWeight: 500 }}>/ {c.max}</span>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={c.max}
+                  step={step}
+                  value={scores[c.key] ?? 0}
+                  onChange={(e) => setScore(c.key, Number(e.target.value), c.max, step)}
+                  style={{ width: "100%", accentColor: "#0804ff", cursor: "pointer" }}
+                />
               </div>
-              <input
-                type="range"
-                min={0}
-                max={c.max}
-                step={1}
-                value={scores[c.key] ?? 0}
-                onChange={(e) => setScore(c.key, Number(e.target.value), c.max)}
-                style={{ width: "100%", accentColor: "#0804ff", cursor: "pointer" }}
-              />
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

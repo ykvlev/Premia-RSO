@@ -12,6 +12,7 @@ import { DocumentVault } from "@/components/document-vault";
 import { ApplicationComments } from "@/components/application-comments";
 import { ParticipantProtocolLink } from "@/components/participant-protocol";
 import type { AppStatus } from "@/lib/generated/prisma/client";
+import { parseCriteria as parseScoringCriteria, calcTotal as calcScoringTotal } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Личный кабинет" };
 export const dynamic = "force-dynamic";
@@ -39,7 +40,7 @@ export default async function CabinetPage() {
       const a = await db.application.findMany({
         where: { email },
         include: {
-          nomination: { select: { title: true } },
+          nomination: { select: { title: true, criteria: true } },
           attachments: { select: { id: true, filename: true, url: true, mime: true, size: true } },
           events: { orderBy: { createdAt: "desc" }, take: 10 },
           comments: { orderBy: { createdAt: "asc" } },
@@ -325,12 +326,15 @@ export default async function CabinetPage() {
                         createdAt: a.createdAt.toISOString(),
                         nominationTitle: a.nomination.title,
                         expertComment: a.expertComment || undefined,
-                        evaluations: a.evaluations.map((ev: any) => ({
-                          juryName: ev.juryUserId,
-                          scores: ev.scores as Record<string, number>,
-                          total: Object.values(ev.scores as Record<string, number>).reduce((sum: number, v: number) => sum + v, 0),
-                          comment: ev.comment || undefined,
-                        })),
+                        evaluations: (() => {
+                          const criteria = parseScoringCriteria(a.nomination.criteria);
+                          return a.evaluations.map((ev: any) => ({
+                            juryName: ev.juryUserId,
+                            scores: ev.scores as Record<string, number>,
+                            total: calcScoringTotal(ev.scores as Record<string, number>, criteria),
+                            comment: ev.comment || undefined,
+                          }));
+                        })(),
                         events: (a.events || []).map((e: any) => ({
                           action: e.action,
                           createdAt: e.createdAt instanceof Date ? e.createdAt.toISOString() : String(e.createdAt),

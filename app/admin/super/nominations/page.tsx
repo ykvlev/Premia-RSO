@@ -18,7 +18,7 @@ export default async function NominationsAdminPage() {
     ? await db.nomination.findMany({
         where: { seasonId: season.id },
         orderBy: { title: "asc" },
-        select: { id: true, title: true, participantType: true, description: true, formSchema: true },
+        select: { id: true, title: true, participantType: true, description: true, formSchema: true, criteria: true },
       })
     : [];
 
@@ -28,6 +28,7 @@ export default async function NominationsAdminPage() {
     participantType: n.participantType,
     description: n.description ?? "",
     formSchema: Array.isArray(n.formSchema) ? (n.formSchema as NomData["formSchema"]) : [],
+    criteria: Array.isArray(n.criteria) ? (n.criteria as NomData["criteria"]) : [],
   }));
 
   return (
