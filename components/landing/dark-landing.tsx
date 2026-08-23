@@ -1782,7 +1782,9 @@ function StageContent({
           fontFamily: "var(--font-onest), sans-serif",
           lineHeight: 1.75,
           maxWidth: "none",
-          textAlign: align,
+          textAlign: "justify",
+          hyphens: "auto" as any,
+          textAlignLast: align as any,
         }}
       >
         {stage.desc}
