@@ -317,6 +317,39 @@ const FIELDS: Record<string, Field[]> = {
     { name: "vk", label: "Ссылка на личную страницу «ВКонтакте»", type: "url", required: true },
     { name: "heroStory", label: "История героя", type: "textarea", required: true },
   ],
+  // Вузовская практика — зеркально критериям
+  "Лучшая практика организации деятельности студотрядов в образовательной организации высшего образования": [
+    { name: "scaleCoverage", label: "Масштаб и охват деятельности студотрядов в вузе", type: "textarea", required: true },
+    { name: "supportSystem", label: "Система поддержки и развития студотрядов", type: "textarea", required: true },
+    { name: "achievements", label: "Достижения и результаты деятельности", type: "textarea", required: true },
+    { name: "employerCoop", label: "Взаимодействие с работодателями и партнёрами", type: "textarea", required: true },
+    { name: "materialUrl", label: "Ссылка на подтверждающие материалы в облачном хранилище", type: "url" },
+  ],
+  "Лучшая практика организации деятельности студотрядов в профессиональной и общеобразовательной организации": [
+    { name: "scaleCoverage", label: "Масштаб и охват деятельности студотрядов", type: "textarea", required: true },
+    { name: "supportSystem", label: "Система поддержки и развития студотрядов", type: "textarea", required: true },
+    { name: "achievements", label: "Достижения и результаты деятельности", type: "textarea", required: true },
+    { name: "employerCoop", label: "Взаимодействие с работодателями и партнёрами", type: "textarea", required: true },
+    { name: "materialUrl", label: "Ссылка на подтверждающие материалы в облачном хранилище", type: "url" },
+  ],
+  "Мастер слова «Событие года»": [
+    { name: "materialLink", label: "Ссылка на публикацию / материал", type: "url", required: true },
+    { name: "significance", label: "Значимость и актуальность материала", type: "textarea", required: true },
+    { name: "qualityDepth", label: "Качество подачи и глубина раскрытия темы", type: "textarea", required: true },
+    { name: "reachImpact", label: "Охват и влияние публикации", type: "textarea", required: true },
+  ],
+  "Мастер слова «Событие РСО в региональном аспекте»": [
+    { name: "materialLink", label: "Ссылка на публикацию / материал", type: "url", required: true },
+    { name: "regionalSignificance", label: "Региональная значимость материала", type: "textarea", required: true },
+    { name: "qualityDepth", label: "Качество подачи и глубина раскрытия темы", type: "textarea", required: true },
+    { name: "reachImpact", label: "Охват и влияние публикации", type: "textarea", required: true },
+  ],
+  "«Едины делом: Трудовой сезон РСО в объективе»": [
+    { name: "materialLink", label: "Ссылка на фото / видео материал", type: "url", required: true },
+    { name: "artisticValue", label: "Художественная ценность и техника исполнения", type: "textarea", required: true },
+    { name: "themeFit", label: "Соответствие теме трудового сезона РСО", type: "textarea", required: true },
+    { name: "emotionalImpact", label: "Эмоциональное воздействие и оригинальность", type: "textarea", required: true },
+  ],
 };
 
 /** Для номинаций без официального приложения — универсальный набор (уточнить по положению). */

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth-helpers";
 import { db, safeDb } from "@/lib/db";
 import { getDownloadUrl } from "@/lib/storage";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 import {
   AdminApp,
   type Application as MockApp,
@@ -52,15 +53,20 @@ export default async function AdminPage() {
       const str = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "");
       const fio = str("nomineeFio") || a.contactFio || a.orgName;
       const [last = "", first = "", patr = ""] = fio.split(" ");
-      const crit = (a.nomination.criteria ?? []) as { label: string; maxScore?: number }[];
-      const totals = a.evaluations.map((e) => {
-        const s = (e.scores ?? {}) as Record<string, number>;
-        return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-      });
-      const score =
-        totals.length > 0
-          ? Math.round(totals.reduce((s, t) => s + t, 0) / totals.length)
-          : null;
+      const criteria = parseCriteria(a.nomination.criteria);
+      const totals = a.evaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, criteria));
+      const score = calcAvgTotal(totals) !== null ? Math.round(calcAvgTotal(totals)!) : null;
+      // средний балл по каждому критерию (для карточки — синхронизация с жюри)
+      const avgByKey = new Map<string, number>();
+      if (a.evaluations.length > 0) {
+        for (const c of criteria) {
+          const vals = a.evaluations.map((e) => Number(((e.scores ?? {}) as Record<string, number>)[c.key]) || 0);
+          const avg = vals.reduce((s, v) => s + v, 0) / vals.length;
+          // округлить до шага
+          const inv = 1 / c.step;
+          avgByKey.set(c.key, Math.round(avg * inv) / inv);
+        }
+      }
       const attachments = await Promise.all(
         a.attachments.map(async (f) => ({
           filename: f.filename,
@@ -84,7 +90,7 @@ export default async function AdminPage() {
         status: DB_TO_MOCK[a.status],
         expertComment: a.expertComment ?? "",
         score,
-        scores: crit.map((c) => ({ label: c.label, max: c.maxScore ?? 100, value: null })),
+        scores: criteria.map((c) => ({ label: c.label, max: c.maxScore, value: avgByKey.has(c.key) ? (avgByKey.get(c.key) as number) : null })),
         nomination: a.nominationId,
         nominationTitle: a.nomination.title,
         orgType: a.participantType,

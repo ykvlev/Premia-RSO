@@ -252,36 +252,30 @@ function NominationRow({ nom }: { nom: NomData }) {
                     <button onClick={() => move(i, -1)} title="Выше" style={arrow}>↑</button>
                     <button onClick={() => move(i, 1)} title="Ниже" style={arrow}>↓</button>
                   </div>
-                  <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <input
-                        value={f.label}
-                        onChange={(e) =>
-                          set(i, {
-                            label: e.target.value,
-                            name:
-                              !f.name || f.name === translit(f.label)
-                                ? translit(e.target.value)
-                                : f.name,
-                          })
-                        }
-                        placeholder="Подпись поля (как видит участник)"
-                        style={input}
-                      />
-                    </div>
+                  <div style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
                     <input
-                      value={f.name}
-                      onChange={(e) => set(i, { name: e.target.value })}
-                      placeholder="имя (лат.)"
-                      style={{ ...input, fontFamily: MONO, fontSize: 12 }}
+                      value={f.label}
+                      onChange={(e) =>
+                        set(i, {
+                          label: e.target.value,
+                          name: translit(e.target.value) || f.name,
+                        })
+                      }
+                      placeholder="Подпись поля (как видит участник)"
+                      style={input}
                     />
-                    <select value={f.type} onChange={(e) => set(i, { type: e.target.value })} style={input}>
-                      {TYPES.map((t) => (
-                        <option key={t.v} value={t.v} style={{ background: "#121216" }}>
-                          {t.l}
-                        </option>
-                      ))}
-                    </select>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <select value={f.type} onChange={(e) => set(i, { type: e.target.value })} style={{ ...input, flex: 1 }}>
+                        {TYPES.map((t) => (
+                          <option key={t.v} value={t.v} style={{ background: "#121216" }}>
+                            {t.l}
+                          </option>
+                        ))}
+                      </select>
+                      <span style={{ alignSelf: "center", color: "#4a4a52", fontSize: 11, fontFamily: MONO, whiteSpace: "nowrap" }} title="служебное имя — генерируется автоматически">
+                        {f.name || translit(f.label) || "—"}
+                      </span>
+                    </div>
                     {f.type === "select" && (
                       <div style={{ gridColumn: "1 / -1" }}>
                         <input
