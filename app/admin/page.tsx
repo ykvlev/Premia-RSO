@@ -90,7 +90,7 @@ export default async function AdminPage() {
         status: DB_TO_MOCK[a.status],
         expertComment: a.expertComment ?? "",
         score,
-        scores: criteria.map((c) => ({ label: c.label, max: c.maxScore, value: avgByKey.has(c.key) ? (avgByKey.get(c.key) as number) : null })),
+        scores: criteria.map((c) => ({ label: c.label, max: c.maxScore, value: avgByKey.has(c.key) ? (avgByKey.get(c.key) as number) : null, step: c.step, weight: c.weight })),
         nomination: a.nominationId,
         nominationTitle: a.nomination.title,
         orgType: a.participantType,

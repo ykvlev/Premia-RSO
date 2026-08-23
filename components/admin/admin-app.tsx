@@ -167,6 +167,8 @@ interface ScoreItem {
   label: string;
   max: number;
   value: number | null;
+  step?: number;
+  weight?: number;
 }
 
 interface ActivityEntry {
@@ -1324,7 +1326,22 @@ function DetailView({
     .join(" ");
 
   const setScore = (i: number, raw: string) => {
-    const n = raw === "" ? null : Math.max(0, Math.min(local.scores[i].max, Number(raw)));
+    if (raw === "") {
+      setLocal((prev) => {
+        const scores = prev.scores.map((s, idx2) => (idx2 === i ? { ...s, value: null } : s));
+        return { ...prev, scores, score: scores.some((s) => s.value !== null) ? calcTotal(scores) : null };
+      });
+      return;
+    }
+    const step = local.scores[i].step ?? 0.5;
+    let v = Number(raw.replace(",", "."));
+    if (!Number.isFinite(v)) return;
+    const inv = 1 / step;
+    v = Math.round(v * inv) / inv;
+    v = Math.max(0, Math.min(local.scores[i].max, v));
+    const dec = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
+    v = Number(v.toFixed(dec));
+    const n = v;
     setLocal((prev) => {
       const scores = prev.scores.map((s, idx2) => (idx2 === i ? { ...s, value: n } : s));
       return {
@@ -1807,6 +1824,7 @@ function DetailView({
                     value={s.value ?? ""}
                     min={0}
                     max={s.max}
+                    step={s.step ?? 0.5}
                     placeholder="—"
                     disabled={!canEdit}
                     onChange={(e) => setScore(i, e.target.value)}
