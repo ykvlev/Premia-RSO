@@ -21,7 +21,7 @@ export function parseCriteria(raw: unknown): Criterion[] {
     const label = typeof o.label === "string" ? o.label : key;
     const maxScore = typeof o.maxScore === "number" && o.maxScore > 0 ? o.maxScore : 10;
     const weight = typeof o.weight === "number" && o.weight > 0 ? o.weight : 1;
-    const step = typeof o.step === "number" && o.step > 0 ? o.step : 0.5;
+    const step = typeof o.step === "number" && o.step > 0 ? o.step : 1;
     out.push({ key, label, maxScore, weight, step });
   }
   if (out.length === 0) return [FALLBACK];
@@ -36,7 +36,7 @@ function clampStep(value: number, step: number): number {
 export function clampScore(value: number, max: number, step: number): number {
   if (!Number.isFinite(value)) return 0;
   let v = clampStep(value, step);
-  v = Math.max(0, Math.min(max, v));
+  v = Math.max(1, Math.min(max, v));
   // fix floating point e.g. 7.5 -> 7.50000001
   const decimals = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
   return Number(v.toFixed(decimals));

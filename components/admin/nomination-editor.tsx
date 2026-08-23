@@ -69,7 +69,7 @@ function NominationRow({ nom }: { nom: NomData }) {
   const [desc, setDesc] = useState(nom.description);
   const [fields, setFields] = useState<Field[]>(nom.formSchema.map((f) => ({ ...f })));
   const [criteria, setCriteria] = useState<Criterion[]>(() =>
-    nom.criteria.length > 0 ? nom.criteria.map((c) => ({ ...c })) : [{ key: "c1", label: "", maxScore: 10, weight: 1, step: 0.5 }],
+    nom.criteria.length > 0 ? nom.criteria.map((c) => ({ ...c, step: 1 })) : [{ key: "c1", label: "", maxScore: 10, weight: 1, step: 1 }],
   );
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -100,7 +100,7 @@ function NominationRow({ nom }: { nom: NomData }) {
       return c.map((x, idx) => ({ ...x, key: `c${idx + 1}` }));
     });
   const addCrit = () =>
-    setCriteria((cs) => [...cs, { key: `c${cs.length + 1}`, label: "", maxScore: 10, weight: 1, step: 0.5 }]);
+    setCriteria((cs) => [...cs, { key: `c${cs.length + 1}`, label: "", maxScore: 10, weight: 1, step: 1 }]);
 
   const save = async () => {
     setSaving(true);
@@ -159,7 +159,7 @@ function NominationRow({ nom }: { nom: NomData }) {
           />
 
           <p style={{ color: "#9a9aa4", fontSize: 12, fontFamily: F, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.6px", margin: "20px 0 10px" }}>
-            Критерии оценки жюри ({criteria.length}) — шаг 0.5, макс 10, вес
+            Критерии оценки жюри ({criteria.length}) — 1–10 баллов, вес
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
             {criteria.map((c, i) => (
@@ -200,15 +200,7 @@ function NominationRow({ nom }: { nom: NomData }) {
                     style={{ ...input, width: 58, fontFamily: MONO, fontSize: 12, padding: "6px 8px" }}
                   />
                 </div>
-                <select
-                  value={String(c.step)}
-                  onChange={(e) => setCrit(i, { step: Number(e.target.value) as 0.1 | 0.5 | 1 })}
-                  style={{ ...input, width: 72, fontSize: 12, padding: "6px 8px" }}
-                >
-                  <option value="0.1" style={{ background: "#121216" }}>шаг 0.1</option>
-                  <option value="0.5" style={{ background: "#121216" }}>шаг 0.5</option>
-                  <option value="1" style={{ background: "#121216" }}>шаг 1</option>
-                </select>
+                <span style={{ color: "#4a4a52", fontSize: 11, fontFamily: F, whiteSpace: "nowrap" }} title="баллы 1–10">1–10</span>
                 <button onClick={() => removeCrit(i)} title="Удалить критерий" style={{ ...arrow, color: "#ff6b6b", borderColor: "#ff6b6b44" }}>✕</button>
               </div>
             ))}

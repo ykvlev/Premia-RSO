@@ -47,7 +47,7 @@ const STATUS_LABEL: Record<string, string> = Object.fromEntries(
 function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
   const [scores, setScores] = useState<Record<string, number>>(() => {
     const init: Record<string, number> = {};
-    for (const c of item.criteria) init[c.key] = item.myScores[c.key] ?? 0;
+    for (const c of item.criteria) init[c.key] = item.myScores[c.key] ?? 1;
     return init;
   });
   const [comment, setComment] = useState(item.myComment);
@@ -81,7 +81,7 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
   function setScore(key: string, value: number, max: number, step: number) {
     const inv = 1 / step;
     let v = Math.round(value * inv) / inv;
-    v = Math.max(0, Math.min(max, v));
+    v = Math.max(1, Math.min(max, v));
     const dec = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
     v = Number(v.toFixed(dec));
     setScores((p) => ({ ...p, [key]: v }));
@@ -218,7 +218,7 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
       {perms.score && (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {item.criteria.map((c) => {
-            const step = c.step ?? 0.5;
+            const step = c.step ?? 1;
             const weight = c.weight ?? 1;
             return (
               <div key={c.key}>
@@ -233,10 +233,10 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
                 </div>
                 <input
                   type="range"
-                  min={0}
+                  min={1}
                   max={c.max}
                   step={step}
-                  value={scores[c.key] ?? 0}
+                  value={scores[c.key] ?? 1}
                   onChange={(e) => setScore(c.key, Number(e.target.value), c.max, step)}
                   style={{ width: "100%", accentColor: "#0804ff", cursor: "pointer" }}
                 />

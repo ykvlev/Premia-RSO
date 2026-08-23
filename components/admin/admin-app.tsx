@@ -1333,12 +1333,12 @@ function DetailView({
       });
       return;
     }
-    const step = local.scores[i].step ?? 0.5;
+    const step = local.scores[i].step ?? 1;
     let v = Number(raw.replace(",", "."));
     if (!Number.isFinite(v)) return;
     const inv = 1 / step;
     v = Math.round(v * inv) / inv;
-    v = Math.max(0, Math.min(local.scores[i].max, v));
+    v = Math.max(1, Math.min(local.scores[i].max, v));
     const dec = step < 1 ? String(step).split(".")[1]?.length ?? 0 : 0;
     v = Number(v.toFixed(dec));
     const n = v;
@@ -1822,9 +1822,9 @@ function DetailView({
                   <input
                     type="number"
                     value={s.value ?? ""}
-                    min={0}
+                    min={1}
                     max={s.max}
-                    step={s.step ?? 0.5}
+                    step={s.step ?? 1}
                     placeholder="—"
                     disabled={!canEdit}
                     onChange={(e) => setScore(i, e.target.value)}

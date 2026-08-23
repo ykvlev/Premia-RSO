@@ -108,8 +108,8 @@ export async function updateNomination(
       const weight = Number(c.weight);
       if (!Number.isFinite(weight) || weight < 0.1 || weight > 5)
         return { ok: false, error: `Критерий ${i + 1}: вес 0.1–5.` };
-      const step = Number(c.step);
-      if (![0.1, 0.5, 1].includes(step)) return { ok: false, error: `Критерий ${i + 1}: шаг — 0.1, 0.5 или 1.` };
+      const step = Number(c.step) || 1;
+      if (step !== 1) return { ok: false, error: `Критерий ${i + 1}: шаг — только 1.` };
       out.push({ key: (c.key || `c${i + 1}`).trim() || `c${i + 1}`, label, maxScore, weight, step });
     }
     // уникальность key

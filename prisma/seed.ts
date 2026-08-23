@@ -369,7 +369,7 @@ const nominations = raw.map((n) => ({
     label,
     maxScore: 10,
     weight: 1,
-    step: 0.5,
+    step: 1,
   })),
   formSchema: (FIELDS[n.title] ?? DEFAULT_FIELDS) as unknown[],
 }));

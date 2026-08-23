@@ -188,10 +188,10 @@ const STAGES = [
 ];
 
 const STATS = [
-  { num: 500, suffix: "+", label: "Организаций\nучастников" },
-  { num: 13, suffix: "", label: "Номинаций\nсезона" },
-  { num: 85, suffix: "", label: "Регионов\nстраны" },
-  { num: 2024, suffix: "", label: "Реализуется\nс" },
+  { num: 1959, suffix: "", label: "Год основания\nдвижения РСО" },
+  { num: 65, suffix: "+", label: "Лет истории\nстудотрядов" },
+  { num: 20, suffix: " млн+", label: "Участников\nза историю" },
+  { num: 89, suffix: "", label: "Регионов\nстраны" },
 ];
 
 const DEADLINE = new Date("2026-11-01T00:00:00");
@@ -989,19 +989,12 @@ function AboutLabel({
 
 function AboutSection({ stats }: { stats?: LiveStats }) {
   const { ref, visible } = useScrollVisible(0.1);
-  // Живые счётчики из БД (если переданы) — иначе статические ориентиры.
-  const liveStats = stats
-    ? [
-        { num: stats.applications, suffix: "", label: "Заявок\nподано" },
-        { num: stats.nominations, suffix: "", label: "Номинаций\nсезона" },
-        { num: stats.regions, suffix: "", label: "Регионов\nучаствует" },
-        { num: 2024, suffix: "", label: "Реализуется\nс" },
-      ]
-    : STATS;
+  // Исторические ориентиры РСО — вместо живых счётчиков.
+  const liveStats = STATS;
   return (
     <section
       ref={ref}
-      style={{ background: "#08080a", borderBottom: "1px solid #2a2a32" }}
+      style={{ background: "#08080a", borderBottom: "1px solid #2a2a32", paddingTop: 32 }}
     >
       <div className="about-inner">
         {/* Full-bleed ceremony photo with overlays */}
@@ -1707,32 +1700,7 @@ function NominationsSection({
             </span>
           </motion.div>
         ))}
-        {/* Blue cap cell */}
-        <div
-          style={{
-            minWidth: 320,
-            background: "#0804ff",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "flex-end",
-            padding: "40px 32px",
-          }}
-        >
-          <p
-            style={{
-              color: "white",
-              fontSize: 48,
-              fontFamily: "var(--font-onest), sans-serif",
-              fontWeight: 800,
-              lineHeight: 1,
-              margin: 0,
-              opacity: 0.3,
-            }}
-          >
-            →
-          </p>
-        </div>
-        <div style={{ minWidth: 80, flexShrink: 0 }} />
+        <div style={{ minWidth: 40, flexShrink: 0 }} />
       </div>
 
       <AnimatePresence>
@@ -1808,7 +1776,7 @@ function StageContent({
           fontSize: 15,
           fontFamily: "var(--font-onest), sans-serif",
           lineHeight: 1.75,
-          maxWidth: 420,
+          maxWidth: "none",
           textAlign: align,
         }}
       >
@@ -2312,7 +2280,7 @@ function FaqSection() {
       >
         Вопросы
       </p>
-      <div style={{ maxWidth: 900 }}>
+      <div style={{ maxWidth: "none" }}>
         {FAQ.map((item, i) => (
           <FaqItem key={i} q={item.q} a={item.a} />
         ))}
