@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   // Verify user has access to this application
   const app = await db.application.findUnique({
     where: { id: applicationId },
-    select: { email: true, userId: true },
+    select: { email: true, userId: true, nominationId: true },
   });
 
   if (!app) {
@@ -28,7 +28,14 @@ export async function GET(req: NextRequest) {
   const isJury = (session.user as any).role === "jury";
   const isOwner = app.email === email || app.userId === session.user.id;
 
-  if (!isOwner && !isAdmin && !isJury) {
+  let assignedJury = false;
+  if (isJury) {
+    assignedJury = !!(await db.juryAssignment.findFirst({
+      where: { juryUserId: session.user.id, nominationId: app.nominationId },
+      select: { id: true },
+    }));
+  }
+  if (!isOwner && !isAdmin && !assignedJury) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
@@ -36,7 +43,7 @@ export async function GET(req: NextRequest) {
     where: {
       applicationId,
       // Participants can't see internal comments
-      ...(isOwner && !isAdmin ? { isInternal: false } : {}),
+      ...(!isAdmin ? { isInternal: false } : {}),
     },
     orderBy: { createdAt: "asc" },
   });

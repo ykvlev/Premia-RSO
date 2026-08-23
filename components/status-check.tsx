@@ -101,11 +101,6 @@ export function StatusCheck() {
               <p style={{ color: "#f2f0ec", fontSize: 22, fontWeight: 800, margin: 0 }}>
                 {res.status}
               </p>
-              {res.comment && (
-                <p style={{ color: "#c8c8d0", fontSize: 13, margin: "12px 0 0", lineHeight: 1.5 }}>
-                  Комментарий эксперта: {res.comment}
-                </p>
-              )}
             </div>
           ) : (
             <p style={{ color: "#e06a6a", fontSize: 14, fontFamily: F }}>{res.error}</p>

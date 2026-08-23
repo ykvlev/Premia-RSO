@@ -193,6 +193,8 @@ export async function deleteApplication(id: string) {
     db.evaluation.deleteMany({ where: { applicationId: id } }),
     db.attachment.deleteMany({ where: { applicationId: id } }),
     db.juryRecusal.deleteMany({ where: { applicationId: id } }),
+    db.applicationComment.deleteMany({ where: { applicationId: id } }),
+    db.applicationEvent.deleteMany({ where: { applicationId: id } }),
     db.application.delete({ where: { id } }),
   ]);
   return { ok: true as const };

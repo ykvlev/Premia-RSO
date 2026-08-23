@@ -161,7 +161,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+        const email = parsed.data.email.trim().toLowerCase();
+        const { password } = parsed.data;
 
         // ── Dev-режим: БД недоступна → мок-пользователи ──
         if (process.env.NODE_ENV !== "production" && !(await isDbAvailable())) {

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 import {
   measure,
   getPerfStats,
@@ -443,7 +444,7 @@ export default async function SuperPage() {
     // Jury charts data
     const juryUsers = await db.user.findMany({ where: { role: "jury" }, select: { id: true, fio: true, email: true } });
     const allAssignments = await db.juryAssignment.findMany({ select: { juryUserId: true, nominationId: true } });
-    const allEvaluations = await db.evaluation.findMany({ select: { juryUserId: true, scores: true } });
+    const allEvaluations = await db.evaluation.findMany({ select: { juryUserId: true, scores: true, application: { select: { nomination: { select: { criteria: true } } } } } });
     const allRecusals = await db.juryRecusal.findMany({ select: { juryUserId: true } });
     const nomCounts2 = await db.application.groupBy({ by: ["nominationId"], _count: { _all: true } });
     const nomCountMap2 = new Map(nomCounts2.map((n) => [n.nominationId, n._count._all]));
@@ -451,14 +452,13 @@ export default async function SuperPage() {
       const assigned = allAssignments.filter((a) => a.juryUserId === u.id).reduce((sum, a) => sum + (nomCountMap2.get(a.nominationId) ?? 0), 0);
       const evaluated = allEvaluations.filter((e) => e.juryUserId === u.id).length;
       const recused = allRecusals.filter((r) => r.juryUserId === u.id).length;
-      const scores = allEvaluations.filter((e) => e.juryUserId === u.id).map((e) => {
-        const s = (e.scores ?? {}) as Record<string, number>;
-        return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-      });
+      const scores = allEvaluations.filter((e) => e.juryUserId === u.id).map((e) =>
+        calcTotal((e.scores ?? {}) as Record<string, number>, parseCriteria(e.application.nomination.criteria)),
+      );
       return {
         id: u.id, fio: u.fio, email: u.email, assigned, evaluated, recused,
         pending: Math.max(0, assigned - evaluated - recused),
-        avgScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+        avgScore: calcAvgTotal(scores),
       };
     });
 

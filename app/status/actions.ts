@@ -49,6 +49,6 @@ export async function checkApplicationStatus(input: { number: string; email: str
     status: LABEL[app.status],
     nomination: app.nomination.title,
     submitted: app.createdAt.toLocaleDateString("ru-RU"),
-    comment: app.expertComment ?? "",
+    // Публичная проверка показывает только статус; комментарий доступен в кабинете.
   };
 }

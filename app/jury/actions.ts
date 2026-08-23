@@ -138,6 +138,10 @@ export async function submitEvaluation(input: {
       if (!Number.isFinite(n)) continue;
       scores[k] = clampScore(n, c.maxScore, c.step);
     }
+    const missing = criteria.filter((c) => !Object.prototype.hasOwnProperty.call(scores, c.key));
+    if (missing.length > 0) {
+      return { ok: false as const, error: `Выставьте баллы по всем критериям: ${missing.map((c) => c.label).join(", ")}` };
+    }
   }
   const comment = perms.comment ? input.comment.trim() : "";
 

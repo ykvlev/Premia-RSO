@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import { ManagementPanel } from "@/components/admin/management-panel";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 
 export const metadata: Metadata = { title: "Управление заявками · Админка" };
 export const dynamic = "force-dynamic";
@@ -14,7 +15,7 @@ export default async function ManagementPage() {
       orderBy: { createdAt: "desc" },
       take: 50,
       include: {
-        nomination: { select: { id: true, title: true } },
+        nomination: { select: { id: true, title: true, criteria: true } },
         evaluations: { select: { scores: true } },
         events: { orderBy: { createdAt: "desc" }, take: 5, select: { actor: true, action: true, createdAt: true } },
         _count: { select: { evaluations: true } },
@@ -29,8 +30,10 @@ export default async function ManagementPage() {
   // Jury workload
   const juryUsers = await db.user.findMany({ where: { role: "jury" }, select: { id: true, fio: true, email: true } });
   const allAssignments = await db.juryAssignment.findMany({ select: { juryUserId: true, nominationId: true } });
-  const allEvaluations = await db.evaluation.findMany({ select: { juryUserId: true, scores: true } });
-  const allRecusals = await db.juryRecusal.findMany({ select: { juryUserId: true } });
+  const allEvaluations = await db.evaluation.findMany({ select: { juryUserId: true, applicationId: true, scores: true } });
+  const allRecusals = await db.juryRecusal.findMany({ select: { juryUserId: true, applicationId: true } });
+  const applicationNomination = new Map(apps.map((a) => [a.id, a.nominationId]));
+  const criteriaByNomination = new Map(apps.map((a) => [a.nominationId, parseCriteria(a.nomination.criteria)]));
   const nomCounts = await db.application.groupBy({ by: ["nominationId"], _count: { _all: true } });
   const nomCountMap = new Map(nomCounts.map((n) => [n.nominationId, n._count._all]));
 
@@ -38,30 +41,27 @@ export default async function ManagementPage() {
     const assigned = allAssignments
       .filter((a) => a.juryUserId === u.id)
       .reduce((sum, a) => sum + (nomCountMap.get(a.nominationId) ?? 0), 0);
-    const evaluated = allEvaluations.filter((e) => e.juryUserId === u.id).length;
-    const recused = allRecusals.filter((r) => r.juryUserId === u.id).length;
-    const scores = allEvaluations.filter((e) => e.juryUserId === u.id).map((e) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
+    const assignedNomIds = new Set(allAssignments.filter((a) => a.juryUserId === u.id).map((a) => a.nominationId));
+    const userEvaluations = allEvaluations.filter((e) => e.juryUserId === u.id && assignedNomIds.has(applicationNomination.get(e.applicationId) ?? ""));
+    const userRecusals = allRecusals.filter((r) => r.juryUserId === u.id && assignedNomIds.has(applicationNomination.get(r.applicationId) ?? ""));
+    const evaluated = userEvaluations.length;
+    const recused = userRecusals.length;
+    const scores = userEvaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, criteriaByNomination.get(applicationNomination.get(e.applicationId) ?? "") ?? parseCriteria([])));
     return {
       id: u.id, fio: u.fio, email: u.email, assigned, evaluated, recused,
       pending: Math.max(0, assigned - evaluated - recused),
-      avgScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+      avgScore: calcAvgTotal(scores),
     };
   });
 
   const mappedApps = apps.map((a) => {
-    const totals = a.evaluations.map((e) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
+    const totals = a.evaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, parseCriteria(a.nomination.criteria)));
     return {
       id: a.id, orgName: a.orgName, contactFio: a.contactFio, email: a.email, region: a.region,
       status: a.status, createdAt: a.createdAt.toISOString(),
       nominationId: a.nominationId, nominationTitle: a.nomination.title,
       evalCount: a._count.evaluations,
-      avgScore: totals.length > 0 ? Math.round(totals.reduce((s: number, t: number) => s + t, 0) / totals.length) : null,
+      avgScore: calcAvgTotal(totals),
       lastEvents: a.events.map((e) => ({ actor: e.actor, action: e.action, at: e.createdAt.toISOString() })),
     };
   });

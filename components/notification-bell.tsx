@@ -104,6 +104,8 @@ export function NotificationBell() {
     <div ref={ref} style={{ position: "relative" }}>
       <button
         onClick={toggle}
+        aria-label="Уведомления"
+        aria-expanded={open}
         style={{
           position: "relative",
           background: "none",
@@ -144,7 +146,7 @@ export function NotificationBell() {
           top: "100%",
           right: 0,
           marginTop: 8,
-          width: 360,
+           width: "min(360px, calc(100vw - 32px))",
           maxHeight: 440,
           background: C.card,
           border: `1px solid ${C.border}`,

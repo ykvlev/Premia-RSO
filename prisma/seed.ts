@@ -383,11 +383,15 @@ async function main() {
         startAt: new Date("2026-06-01T00:00:00+03:00"),
         endAt: new Date("2026-10-31T23:59:59+03:00"),
         isActive: true,
-        scoringConfig: { formula: "weighted_average" },
+        scoringConfig: { formula: "weighted_sum", scoreMin: 1, scoreMax: 10, scoreStep: 1 },
       },
     });
     console.log(`+ сезон ${season.year}`);
   } else {
+    await prisma.season.update({
+      where: { id: season.id },
+      data: { scoringConfig: { formula: "weighted_sum", scoreMin: 1, scoreMax: 10, scoreStep: 1 } },
+    });
     console.log(`= сезон ${season.year} уже есть`);
   }
 

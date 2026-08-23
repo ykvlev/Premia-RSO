@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db, safeDb } from "@/lib/db";
+import { getDownloadUrl } from "@/lib/storage";
 import { ChangePasswordForm } from "@/components/change-password-form";
 import { CabinetTheme } from "@/components/cabinet-theme";
 import { DeadlineTimer } from "@/components/deadline-timer";
@@ -38,7 +39,7 @@ export default async function CabinetPage() {
   const [apps, season, user, allEvents]: [any[], { endAt: Date } | null, any, any[]] = await safeDb(
     async () => {
       const a = await db.application.findMany({
-        where: { email },
+          where: { OR: [{ userId }, { userId: null, email }] },
         include: {
           nomination: { select: { title: true, criteria: true } },
           attachments: { select: { id: true, filename: true, url: true, mime: true, size: true } },
@@ -48,6 +49,11 @@ export default async function CabinetPage() {
         },
         orderBy: { createdAt: "desc" },
       });
+      for (const application of a) {
+        for (const attachment of application.attachments) {
+          attachment.url = await getDownloadUrl(attachment.url);
+        }
+      }
       const s = await db.season.findFirst({ where: { isActive: true }, select: { endAt: true } });
       const u = await db.user.findUnique({
         where: { id: userId },

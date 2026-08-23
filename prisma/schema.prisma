@@ -164,6 +164,7 @@ model Attachment {
   id            String      @id @default(cuid())
   applicationId String
   application   Application @relation(fields: [applicationId], references: [id])
+  fieldName     String      @default("attachment") // ключ поля formSchema
   filename      String
   url           String
   size          Int

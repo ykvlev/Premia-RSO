@@ -256,7 +256,7 @@ export function ManagementPanel({
                     return (
                       <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid " + C.border }}>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
-                          <span style={{ color: C.text, fontSize: 12, fontFamily: MONO }}>{e.juryId.slice(0, 8)}...</span>
+                          <span style={{ color: C.text, fontSize: 12, fontFamily: MONO }}>{e.juryUserId.slice(0, 8)}...</span>
                           <Badge color={C.green}>{total}</Badge>
                         </div>
                         {e.comment && <p style={{ color: C.dim, fontSize: 11, fontFamily: F, margin: "4px 0 0" }}>{e.comment}</p>}

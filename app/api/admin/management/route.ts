@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 
 export async function GET(req: NextRequest) {
   await requireRole("admin", "superadmin");
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     skip: (page - 1) * limit,
     take: limit,
     include: {
-      nomination: { select: { id: true, title: true } },
+      nomination: { select: { id: true, title: true, criteria: true } },
       evaluations: { select: { scores: true } },
       events: { orderBy: { createdAt: "desc" }, take: 5, select: { actor: true, action: true, createdAt: true } },
       _count: { select: { evaluations: true } },
@@ -46,16 +47,14 @@ export async function GET(req: NextRequest) {
     page,
     totalPages: Math.ceil(total / limit),
     apps: apps.map((a: any) => {
-      const totals = a.evaluations.map((e: any) => {
-        const s = (e.scores ?? {}) as Record<string, number>;
-        return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-      });
+      const criteria = parseCriteria(a.nomination.criteria);
+      const totals = a.evaluations.map((e: any) => calcTotal((e.scores ?? {}) as Record<string, number>, criteria));
       return {
         id: a.id, orgName: a.orgName, contactFio: a.contactFio, email: a.email, region: a.region,
         status: a.status, createdAt: a.createdAt.toISOString(),
         nominationId: a.nominationId, nominationTitle: a.nomination.title,
         evalCount: a._count.evaluations,
-        avgScore: totals.length > 0 ? Math.round(totals.reduce((s: number, t: number) => s + t, 0) / totals.length) : null,
+        avgScore: calcAvgTotal(totals),
         lastEvents: a.events.map((e: any) => ({ actor: e.actor, action: e.action, at: e.createdAt.toISOString() })),
       };
     }),

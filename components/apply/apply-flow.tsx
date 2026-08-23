@@ -1366,6 +1366,8 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
     fd.set("howKnew", form.howKnew);
     fd.set("links", form.links.join("\n"));
     fd.set("consentNewsletter", String(form.consentNewsletter));
+    fd.set("consentPersonal", String(form.consentPersonal));
+    fd.set("consentTerms", String(form.consentTerms));
     fd.set("smart-token", captchaToken);
     if (useDynamic) {
       fd.set("dynamic", "1");

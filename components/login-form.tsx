@@ -27,7 +27,7 @@ export function LoginForm() {
     setPending(true);
     setError(null);
 
-    const res = await signIn("credentials", { redirect: false, email, password });
+    const res = await signIn("credentials", { redirect: false, email: email.trim().toLowerCase(), password });
 
     if (!res || res.error) {
       setError("Неверный email или пароль");

@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth-helpers";
 import { db } from "@/lib/db";
 import type { AppStatus } from "@/lib/generated/prisma/client";
+import { parseCriteria, calcTotal, calcAvgTotal } from "@/lib/scoring";
 
 const STATUS_LABEL_RU: Record<AppStatus, string> = {
   new: "Отправлена", queued: "Ожидает рассмотрения", review: "На рассмотрении",
@@ -23,11 +24,11 @@ export async function getJuryWorkload() {
   });
 
   const evaluations = await db.evaluation.findMany({
-    select: { juryUserId: true, applicationId: true, scores: true, createdAt: true },
+    select: { juryUserId: true, applicationId: true, scores: true, createdAt: true, application: { select: { nomination: { select: { criteria: true } } } } },
   });
 
   const recusals = await db.juryRecusal.findMany({
-    select: { juryUserId: true },
+    select: { juryUserId: true, applicationId: true },
   });
 
   // Get application count per nomination for assignment mapping
@@ -41,16 +42,16 @@ export async function getJuryWorkload() {
     const assigned = assignments
       .filter((a) => a.juryUserId === u.id)
       .reduce((sum, a) => sum + (nomCountMap.get(a.nominationId) ?? 0), 0);
-    const evaluated = evaluations.filter((e) => e.juryUserId === u.id).length;
-    const recused = recusals.filter((r) => r.juryUserId === u.id).length;
-    const scores = evaluations.filter((e) => e.juryUserId === u.id).map((e) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
+    const assignedNomIds = new Set(assignments.filter((a) => a.juryUserId === u.id).map((a) => a.nominationId));
+    const userEvaluations = evaluations.filter((e) => e.juryUserId === u.id && assignedNomIds.has((e as any).application.nomination.id));
+    const userRecusals = recusals.filter((r) => r.juryUserId === u.id);
+    const evaluated = userEvaluations.length;
+    const recused = userRecusals.length;
+    const scores = userEvaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, parseCriteria(e.application.nomination.criteria)));
     return {
       id: u.id, fio: u.fio, email: u.email, assigned, evaluated, recused,
       pending: Math.max(0, assigned - evaluated - recused),
-      avgScore: scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null,
+      avgScore: calcAvgTotal(scores),
     };
   });
 }
@@ -200,9 +201,9 @@ export async function exportApplicationsToExcel(filters: {
 
   // Add criteria columns from first nomination
   const firstNom = apps[0]?.nomination;
-  const critDefs = ((firstNom?.criteria ?? []) as { label: string; maxScore?: number }[]) || [];
+  const critDefs = ((firstNom?.criteria ?? []) as { key: string; label: string; maxScore?: number }[]) || [];
   for (const c of critDefs) {
-    columns.push({ header: c.label, key: `crit_${c.label}`, width: Math.max(14, c.label.length + 4) });
+    columns.push({ header: c.label, key: `crit_${c.key}`, width: Math.max(14, c.label.length + 4) });
   }
 
   ws.columns = columns;
@@ -223,11 +224,9 @@ export async function exportApplicationsToExcel(filters: {
   apps.forEach((a, idx) => {
     const p = (a.payload ?? {}) as Record<string, unknown>;
     const str = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "");
-    const totals = a.evaluations.map((e: any) => {
-      const s = (e.scores ?? {}) as Record<string, number>;
-      return Object.values(s).reduce((sum, v) => sum + (Number(v) || 0), 0);
-    });
-    const avgScore = totals.length > 0 ? Math.round(totals.reduce((s: number, t: number) => s + t, 0) / totals.length) : null;
+    const criteria = parseCriteria(a.nomination.criteria);
+    const totals = a.evaluations.map((e: any) => calcTotal((e.scores ?? {}) as Record<string, number>, criteria));
+    const avgScore = calcAvgTotal(totals);
 
     const rowData: Record<string, any> = {
       num: idx + 1,
@@ -248,10 +247,10 @@ export async function exportApplicationsToExcel(filters: {
 
     // Criteria scores
     for (const c of critDefs) {
-      const key = `crit_${c.label}`;
+      const key = `crit_${c.key}`;
       const scores = a.evaluations.map((e: any) => {
         const s = (e.scores ?? {}) as Record<string, number>;
-        return Number(s[c.label]) || 0;
+        return Number(s[c.key]) || 0;
       });
       rowData[key] = scores.length > 0 ? Math.round(scores.reduce((a: number, b: number) => a + b, 0) / scores.length) : "";
     }
