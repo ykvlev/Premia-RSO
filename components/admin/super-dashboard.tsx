@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData, deleteUser } from "@/app/admin/super/actions";
 import { FeatureFlagsCard } from "@/components/admin/super/feature-flags-card";
 import { AdminProfilesCard } from "@/components/admin/super/admin-profiles-card";
 import { HeatmapCard } from "@/components/admin/super/heatmap-card";
@@ -1165,6 +1165,18 @@ function UserActionsCard({ users }: { users: { id: string; fio: string; email: s
     }
   };
 
+  const doDelete = async () => {
+    if (!selectedId) return;
+    const u = users.find((x) => x.id === selectedId);
+    if (!confirm(`Удалить профиль ${u?.fio || u?.email} (${u?.role}) вместе со всеми заявками и оценками? Это безвозвратно.`)) return;
+    if (!confirm("Точно удалить? Отменить нельзя.")) return;
+    setBusy(true);
+    const res = await deleteUser(selectedId);
+    setBusy(false);
+    if (res.ok) flash("Профиль удалён", C.green);
+    else flash(res.error || "Ошибка", C.red);
+  };
+
   return (
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
@@ -1220,6 +1232,19 @@ function UserActionsCard({ users }: { users: { id: string; fio: string; email: s
           }}
         >
           Экспорт данных
+        </button>
+        <button
+          onClick={doDelete}
+          disabled={busy || !selectedId}
+          style={{
+            ...exportBtn,
+            background: busy || !selectedId ? C.card2 : "#ff3b3018",
+            color: busy || !selectedId ? C.dim : "#ff6b6b",
+            border: `1px solid ${busy || !selectedId ? C.border : "#ff6b6b55"}`,
+            cursor: busy || !selectedId ? "default" : "pointer",
+          }}
+        >
+          Удалить профиль
         </button>
       </div>
       {result && (

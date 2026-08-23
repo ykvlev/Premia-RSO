@@ -715,6 +715,43 @@ export async function deleteAdminProfile(
   }
 }
 
+export async function deleteUser(
+  userId: string,
+): Promise<{ ok: boolean; error?: string }> {
+  await requireRole("superadmin");
+  try {
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, role: true, email: true } });
+    if (!user) return { ok: false, error: "Пользователь не найден" };
+    if (user.role === "superadmin") {
+      const count = await db.user.count({ where: { role: "superadmin" } });
+      if (count <= 1) return { ok: false, error: "Нельзя удалить последнего суперадмина" };
+    }
+    // каскад для участника/жюри: удалить связанные данные
+    const apps = await db.application.findMany({ where: { userId }, select: { id: true } });
+    const appIds = apps.map((a) => a.id);
+    if (appIds.length > 0) {
+      await db.attachment.deleteMany({ where: { applicationId: { in: appIds } } });
+      await db.applicationComment.deleteMany({ where: { applicationId: { in: appIds } } });
+      await db.applicationEvent.deleteMany({ where: { applicationId: { in: appIds } } });
+      await db.evaluation.deleteMany({ where: { applicationId: { in: appIds } } });
+      await db.juryRecusal.deleteMany({ where: { applicationId: { in: appIds } } });
+      await db.application.deleteMany({ where: { id: { in: appIds } } });
+    }
+    await db.evaluation.deleteMany({ where: { juryUserId: userId } });
+    await db.juryAssignment.deleteMany({ where: { juryUserId: userId } });
+    await db.juryRecusal.deleteMany({ where: { juryUserId: userId } });
+    await db.notification.deleteMany({ where: { userId } });
+    await db.passwordReset.deleteMany({ where: { email: user.email } });
+    await db.user.delete({ where: { id: userId } });
+    logAdminAction("delete_user", userId, { email: user.email, role: user.role });
+    revalidatePath("/admin/super");
+    return { ok: true };
+  } catch (e) {
+    recordError(e, "deleteUser");
+    return { ok: false, error: "Ошибка удаления" };
+  }
+}
+
 export async function resetAdminPassword(
   userId: string,
 ): Promise<{ ok: boolean; code?: string; error?: string }> {

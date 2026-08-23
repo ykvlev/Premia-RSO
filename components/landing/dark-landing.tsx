@@ -237,6 +237,7 @@ function GlobalStyles() {
         .contacts-grid { flex-direction:column !important; gap:40px !important; }
         .footer-cols { flex-direction:column !important; gap:28px !important; }
         .footer-pad { padding:40px 22px !important; }
+        .nominations-header { padding:64px 22px 24px !important; }
       }
     `;
     document.head.appendChild(el);
@@ -1554,17 +1555,20 @@ function NominationsSection({
       {/* Header */}
       <div
         ref={ref}
+        className="nominations-header"
         style={{
           padding: "100px 80px 48px",
           display: "flex",
           alignItems: "flex-end",
           justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
         <p
           style={{
             color: "#f2f0ec",
-            fontSize: 64,
+            fontSize: "clamp(32px, 9vw, 64px)",
             fontFamily: "var(--font-onest), sans-serif",
             fontWeight: 800,
             lineHeight: 1,
@@ -1573,6 +1577,8 @@ function NominationsSection({
             opacity: visible ? 1 : 0,
             transform: visible ? "none" : "translateY(24px)",
             transition: "all 0.7s ease",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
           }}
         >
           <GlitchHeading text="Номинации" />
