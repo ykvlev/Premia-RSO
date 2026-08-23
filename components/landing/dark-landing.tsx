@@ -190,7 +190,7 @@ const STAGES = [
 const STATS = [
   { num: 1959, suffix: "", label: "Год основания\nдвижения РСО" },
   { num: 65, suffix: "+", label: "Лет истории\nстудотрядов" },
-  { num: 20, suffix: " млн+", label: "Участников\nза историю" },
+  { num: 20, suffix: "", label: "млн+ участников\nза историю" },
   { num: 89, suffix: "", label: "Регионов\nстраны" },
 ];
 
