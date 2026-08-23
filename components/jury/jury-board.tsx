@@ -339,14 +339,26 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
 
 export function JuryBoard({ items, perms }: { items: JuryItem[]; perms: JuryPerms }) {
   const [query, setQuery] = useState("");
-  const filtered = items.filter((it) => {
+  const [sort, setSort] = useState<"date" | "nom" | "score">("date");
+  const [regionFilter, setRegionFilter] = useState("");
+  const regions = Array.from(new Set(items.map((it) => it.region).filter(Boolean))).sort();
+  let filtered = items.filter((it) => {
     const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return (
-      it.nominee.toLowerCase().includes(q) ||
-      it.nominationTitle.toLowerCase().includes(q) ||
-      it.region.toLowerCase().includes(q)
-    );
+    const byQ = !q || it.nominee.toLowerCase().includes(q) || it.nominationTitle.toLowerCase().includes(q) || it.region.toLowerCase().includes(q);
+    const byRegion = !regionFilter || it.region === regionFilter;
+    return byQ && byRegion;
+  });
+  filtered = [...filtered].sort((a, b) => {
+    if (sort === "nom") return a.nominationTitle.localeCompare(b.nominationTitle);
+    if (sort === "score") {
+      const sa = Object.values(a.myScores).reduce((s, v) => s + v, 0);
+      const sb = Object.values(b.myScores).reduce((s, v) => s + v, 0);
+      const ea = Object.keys(a.myScores).length > 0 ? 1 : 0;
+      const eb = Object.keys(b.myScores).length > 0 ? 1 : 0;
+      if (ea !== eb) return ea - eb;
+      return sa - sb;
+    }
+    return b.submitted.localeCompare(a.submitted);
   });
 
   if (items.length === 0) {
@@ -370,24 +382,45 @@ export function JuryBoard({ items, perms }: { items: JuryItem[]; perms: JuryPerm
 
   return (
     <div>
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Поиск по номинанту, номинации, региону…"
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          background: "#0d0d12",
-          border: "1px solid #2a2a32",
-          borderRadius: 8,
-          color: "#f2f0ec",
-          fontSize: 14,
-          fontFamily: F,
-          padding: "10px 13px",
-          outline: "none",
-          marginBottom: 20,
-        }}
-      />
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск по номинанту, номинации, региону…"
+          style={{
+            flex: "1 1 200px",
+            maxWidth: 420,
+            background: "#0d0d12",
+            border: "1px solid #2a2a32",
+            borderRadius: 8,
+            color: "#f2f0ec",
+            fontSize: 14,
+            fontFamily: F,
+            padding: "10px 13px",
+            outline: "none",
+          }}
+        />
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          style={{ background: "#0d0d12", border: "1px solid #2a2a32", borderRadius: 8, color: "#f2f0ec", fontSize: 13, fontFamily: F, padding: "10px 12px" }}
+        >
+          <option value="">Все регионы</option>
+          {regions.map((r) => (
+            <option key={r} value={r}>{r}</option>
+          ))}
+        </select>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as any)}
+          style={{ background: "#0d0d12", border: "1px solid #2a2a32", borderRadius: 8, color: "#f2f0ec", fontSize: 13, fontFamily: F, padding: "10px 12px" }}
+        >
+          <option value="date">Сначала новые</option>
+          <option value="nom">По номинации</option>
+          <option value="score">По оценке</option>
+        </select>
+      </div>
+      <p style={{ color: "#6a6a72", fontSize: 12, fontFamily: F, marginBottom: 10 }}>Найдено {filtered.length} из {items.length}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         {filtered.map((it) => (
           <JuryCard key={it.id} item={it} perms={perms} />

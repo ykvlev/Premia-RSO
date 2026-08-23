@@ -1197,6 +1197,7 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   // Подсветка незаполненных обязательных полей (после попытки «Далее»/«Отправить»).
   const [triedNext, setTriedNext] = useState(false);
