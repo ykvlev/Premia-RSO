@@ -164,7 +164,7 @@ export const NOMINATIONS: Nomination[] = [
 const STAGES = [
   {
     num: "01",
-    period: "1 августа — 1 ноября 2026",
+    period: "1 сентября — 1 ноября 2026",
     title: "Приём заявок",
     desc: "Организации, региональные отделения, работодатели, представители СМИ и физические лица подают заявки через официальный сайт премии. Каждая заявка содержит описание деятельности, достижений и подтверждающие документы. Экспертный оргкомитет регистрирует и проверяет полноту пакета документов.",
   },
@@ -205,7 +205,7 @@ function GlobalStyles() {
     el.innerHTML = `
       .nominations-scroll::-webkit-scrollbar { display:none; }
       .nominations-scroll { -ms-overflow-style:none; scrollbar-width:none; }
-      .about-inner { position:relative; max-width:1200px; margin:0 auto; min-height:636px; }
+      .about-inner { position:relative; max-width:1200px; margin:0 auto; min-height:720px; }
       .about-photo-wrap { position:absolute; inset:0; overflow:hidden; }
       .about-right { position:absolute; top:0; right:40px; width:340px; height:100%;
         display:flex; flex-direction:column; justify-content:center; z-index:2; }
@@ -1763,6 +1763,8 @@ function StageContent({
           textAlign: "justify",
           hyphens: "auto" as any,
           textAlignLast: align as any,
+          overflowWrap: "anywhere",
+          wordBreak: "break-word",
         }}
       >
         {stage.desc}
