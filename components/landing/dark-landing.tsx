@@ -1352,47 +1352,7 @@ function NominationModal({
           {nom.description}
         </p>
 
-        {/* Criteria — показываем только когда заданы (до положения о премии пусто) */}
-        {nom.criteria.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p
-            style={{
-              color: "#9a9aa4",
-              fontSize: 11,
-              fontFamily: "var(--font-onest), sans-serif",
-              fontWeight: 500,
-              textTransform: "uppercase",
-              letterSpacing: "0.72px",
-            }}
-          >
-            Критерии оценки
-          </p>
-          {nom.criteria.map((c, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  background: nom.accent,
-                  flexShrink: 0,
-                  marginTop: 5,
-                }}
-              />
-              <p
-                style={{
-                  color: "#f2f0ec",
-                  fontSize: 14,
-                  fontFamily: "var(--font-onest), sans-serif",
-                  lineHeight: 1.5,
-                  margin: 0,
-                }}
-              >
-                {c}
-              </p>
-            </div>
-          ))}
-        </div>
-        )}
+        {/* Критерии — по просьбе клиента скрыты из краткого описания (см. положение) */}
 
         {/* CTA */}
         <button
