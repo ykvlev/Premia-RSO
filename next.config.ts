@@ -6,7 +6,7 @@ const isDev = process.env.NODE_ENV !== "production";
 // ВАЖНО: виджет грузится с smartcaptcha.cloud.yandex.ru (см. components/apply/smart-captcha.tsx).
 const CAPTCHA = "https://smartcaptcha.cloud.yandex.ru";
 const SENTRY = "https://browser.sentry-cdn.com";
-const YM = "https://mc.yandex.ru";
+const YM = "https://mc.yandex.ru https://mc.yandex.com";
 const VK = "https://unpkg.com https://id.vk.com https://vk.com";
 
 /**
