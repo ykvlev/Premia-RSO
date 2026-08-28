@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { geoLookup } from "@/lib/geoip";
 import { notifyAdminLogin, notifyFailedLogin } from "@/lib/telegram-notify";
 import type { Role } from "@/lib/generated/prisma/client";
+import { verifyTotpCode } from "@/lib/totp";
 
 /**
  * NextAuth v5: credentials-провайдер, роль в JWT и сессии (SPEC §2, §3).
@@ -16,6 +17,7 @@ import type { Role } from "@/lib/generated/prisma/client";
 const credentialsSchema = z.object({
   email: z.email(),
   password: z.string().min(1),
+  twoFactorCode: z.string().optional(),
 });
 
 const vkSignInSchema = z.object({
@@ -154,6 +156,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Пароль", type: "password" },
+        twoFactorCode: { label: "2FA Code", type: "text" },
       },
       async authorize(credentials, req) {
         const ip = clientIp(req);
@@ -162,7 +165,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const email = parsed.data.email.trim().toLowerCase();
-        const { password } = parsed.data;
+        const { password, twoFactorCode } = parsed.data;
 
         // ── Dev-режим: БД недоступна → мок-пользователи ──
         if (process.env.NODE_ENV !== "production" && !(await isDbAvailable())) {
@@ -194,6 +197,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await compare(password, user.passwordHash);
         if (!valid) {
           await logLogin({ email: user.email, success: false, reason: "bad_password", userId: user.id, role: user.role, fio: user.fio, req });
+          return null;
+        }
+
+        if (user.twoFactorEnabled && (!user.twoFactorSecret || !twoFactorCode || !verifyTotpCode(user.twoFactorSecret, twoFactorCode))) {
+          await logLogin({ email: user.email, success: false, reason: twoFactorCode ? "bad_2fa" : "2fa_required", userId: user.id, role: user.role, fio: user.fio, req });
           return null;
         }
 
@@ -288,10 +296,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
     redirect({ url, baseUrl }) {
-      // После входа — на /profile для участников, иначе по роли
+      // После входа — редиректим на целевую страницу или кабинет
       if (url.startsWith("/")) return `${baseUrl}${url}`;
       if (new URL(url).origin === baseUrl) return url;
-      return `${baseUrl}/profile`;
+      return `${baseUrl}/cabinet`;
     },
   },
 });
