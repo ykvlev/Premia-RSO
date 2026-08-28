@@ -199,6 +199,13 @@ const raw: {
     description: "Описание номинации будет опубликовано в положении о премии.",
     criteria: ["Художественная ценность и техника исполнения", "Соответствие теме трудового сезона РСО", "Эмоциональное воздействие и оригинальность"],
   },
+  // Приложение №9 — персональная номинация
+  {
+    title: "Лидер студенческих отрядов",
+    participantType: "Участник РСО",
+    description: "Персональная номинация для активных участников движения студенческих отрядов, проявивших лидерство в трудовых проектах.",
+    criteria: ["Лидерские качества и организаторский потенциал", "Вклад в развитие движения студотрядов", "Личные достижения и профессиональный рост"],
+  },
 ];
 
 /**
@@ -332,23 +339,52 @@ const FIELDS: Record<string, Field[]> = {
     { name: "employerCoop", label: "Взаимодействие с работодателями и партнёрами", type: "textarea", required: true },
     { name: "materialUrl", label: "Ссылка на подтверждающие материалы в облачном хранилище", type: "url" },
   ],
+  // Приложение №3
   "Мастер слова «Событие года»": [
-    { name: "materialLink", label: "Ссылка на публикацию / материал", type: "url", required: true },
-    { name: "significance", label: "Значимость и актуальность материала", type: "textarea", required: true },
-    { name: "qualityDepth", label: "Качество подачи и глубина раскрытия темы", type: "textarea", required: true },
-    { name: "reachImpact", label: "Охват и влияние публикации", type: "textarea", required: true },
+    { name: "smiName", label: "Полное название СМИ", type: "text", required: true },
+    { name: "legalEntity", label: "Юридическое лицо", type: "text", required: true },
+    { name: "smiRegistration", label: "Сведения о регистрации СМИ", type: "text", required: true },
+    { name: "authorFio", label: "Ф.И.О. (полностью) автора/авторов", type: "text", required: true },
+    { name: "authorWorkplace", label: "Место работы, должность", type: "text", required: true },
+    { name: "authorBirthDate", label: "Дата рождения", type: "text", required: true },
+    { name: "authorPhone", label: "Контактный телефон", type: "text", required: true },
+    { name: "authorEmail", label: "Электронная почта", type: "text", required: true },
+    { name: "workTitle", label: "Название работы", type: "text", required: true },
+    { name: "materialLink", label: "Ссылка на сюжет/новость, представляемый для участия в Национальной премии", type: "url", required: true },
   ],
+  // Приложение №4
   "Мастер слова «Событие РСО в региональном аспекте»": [
-    { name: "materialLink", label: "Ссылка на публикацию / материал", type: "url", required: true },
-    { name: "regionalSignificance", label: "Региональная значимость материала", type: "textarea", required: true },
-    { name: "qualityDepth", label: "Качество подачи и глубина раскрытия темы", type: "textarea", required: true },
-    { name: "reachImpact", label: "Охват и влияние публикации", type: "textarea", required: true },
+    { name: "smiName", label: "Полное название СМИ", type: "text", required: true },
+    { name: "legalEntity", label: "Юридическое лицо", type: "text", required: true },
+    { name: "smiRegistration", label: "Сведения о регистрации СМИ", type: "text", required: true },
+    { name: "authorFio", label: "Ф.И.О. (полностью) автора/авторов", type: "text", required: true },
+    { name: "authorWorkplace", label: "Место работы, должность", type: "text", required: true },
+    { name: "authorBirthDate", label: "Дата рождения", type: "text", required: true },
+    { name: "authorPhone", label: "Контактный телефон", type: "text", required: true },
+    { name: "authorEmail", label: "Электронная почта", type: "text", required: true },
+    { name: "workTitle", label: "Название работы", type: "text", required: true },
+    { name: "materialLink", label: "Ссылка на сюжет/новость, представляемый для участия в Национальной премии", type: "url", required: true },
   ],
   "«Едины делом: Трудовой сезон РСО в объективе»": [
     { name: "materialLink", label: "Ссылка на фото / видео материал", type: "url", required: true },
     { name: "artisticValue", label: "Художественная ценность и техника исполнения", type: "textarea", required: true },
     { name: "themeFit", label: "Соответствие теме трудового сезона РСО", type: "textarea", required: true },
     { name: "emotionalImpact", label: "Эмоциональное воздействие и оригинальность", type: "textarea", required: true },
+  ],
+  // Приложение №9
+  "Лидер студенческих отрядов": [
+    { name: "fio", label: "Ф.И.О. (полностью)", type: "text", required: true },
+    { name: "region", label: "Субъект Российской Федерации", type: "text", required: true },
+    { name: "birthDate", label: "Дата рождения", type: "text", required: true },
+    { name: "projectRole", label: "Укажите категорию", type: "select", required: true, options: ["Командир трудового проекта", "Комиссар трудового проекта"] },
+    { name: "projectName", label: "Название трудового проекта", type: "text", required: true },
+    { name: "phone", label: "Контактный телефон", type: "text", required: true },
+    { name: "email", label: "Электронная почта", type: "text", required: true },
+    { name: "study", label: "Место учёбы / работы", type: "text", required: true },
+    { name: "vk", label: "Ссылка на личную страницу в социальной сети «ВКонтакте»", type: "url", required: true },
+    { name: "videoUrl", label: "Ссылка на видеопрезентацию в облачном хранилище (видеовизитка до 1 минуты)", type: "url", required: true },
+    { name: "staffReport", label: "Отчёт о работе штаба", type: "textarea", required: true },
+    { name: "portfolioUrl", label: "Ссылка на портфолио в облачном хранилище", type: "url" },
   ],
 };
 
