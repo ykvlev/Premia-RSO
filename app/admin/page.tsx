@@ -112,7 +112,7 @@ export default async function AdminPage() {
         descScale: str("descScale"),
         coverageLevel: str("coverageLevel"),
         additionalInfo: str("additionalInfo"),
-        links: (a.links ?? "").split("\n").filter(Boolean),
+        links: (a.links ?? "").split("\n").filter((link) => /^https?:\/\//i.test(link)),
         attachments,
         officialFields,
         internalNote: a.internalNote ?? "",

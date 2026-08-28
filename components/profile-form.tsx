@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateProfile } from "@/app/profile/actions";
 import { REGIONS } from "@/lib/regions";
+import { TwoFactorForm } from "@/components/two-factor-form";
 
 const F = "var(--font-onest), sans-serif";
 
@@ -93,6 +94,7 @@ type User = {
   vkUrl: string | null;
   avatarUrl: string | null;
   emailVerified: Date | null;
+  twoFactorEnabled: boolean;
 };
 
 export function ProfileForm({ user }: { user: User }) {
@@ -184,7 +186,7 @@ export function ProfileForm({ user }: { user: User }) {
       </label>
 
       {/* ── Пол + Дата рождения (рядом) ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="form-two-columns" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
         <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <span style={labelStyle}>Пол *</span>
           <select
@@ -326,6 +328,7 @@ export function ProfileForm({ user }: { user: User }) {
       >
         {pending ? "Сохранение…" : "Сохранить профиль"}
       </button>
+      <TwoFactorForm enabled={user.twoFactorEnabled} />
     </form>
   );
 }

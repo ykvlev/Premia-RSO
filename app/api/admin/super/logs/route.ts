@@ -2,7 +2,7 @@
  * SSE endpoint: live logs from observability buffer.
  * GET /api/admin/super/logs — streams recent requests every 2 seconds.
  */
-import { getRecentRequests, getRecentErrors, type RequestSample, type ErrorEntry } from "@/lib/observability";
+import { getRecentRequests, getRecentErrors } from "@/lib/observability";
 
 export const dynamic = "force-dynamic";
 

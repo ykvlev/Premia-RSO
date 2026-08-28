@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 const F = "var(--font-onest), sans-serif";
 const C = { bg: "#08080a", card2: "#111117", border: "#1d1d25", text: "#f2f0ec", dim: "#6a6a72", muted: "#9a9aa4", accent: "#0804ff", green: "#2fbf6b" };
@@ -25,7 +25,7 @@ function fmtDate(d: string) {
 const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 const MONTHS = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
 
-export function HeatmapCard({ data, title }: { data: DayData[]; title?: string }) {
+export function HeatmapCard({ data }: { data: DayData[] }) {
   const [hovered, setHovered] = useState<DayData | null>(null);
 
   const dataMap = new Map(data.map((d) => [d.date, d.count]));
@@ -77,7 +77,7 @@ export function HeatmapCard({ data, title }: { data: DayData[]; title?: string }
           </div>
           {weeks.map((week, wi) => (
             <div key={wi} style={{ display: "flex", flexDirection: "column", gap: gap }}>
-              {week.map((date, di) => {
+              {week.map((date) => {
                 const count = dataMap.get(date) ?? 0;
                 const level = getLevel(count);
                 const isFuture = date > today.toISOString().slice(0, 10);
@@ -117,8 +117,8 @@ export function HeatmapCard({ data, title }: { data: DayData[]; title?: string }
       {/* Legend */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 8, justifyContent: "flex-end" }}>
         <span style={{ fontSize: 9, color: C.dim }}>Мало</span>
-        {COLORS.map((c, i) => (
-          <div key={i} style={{ width: cellSize, height: cellSize, borderRadius: 2, background: c, border: "1px solid transparent" }} />
+        {COLORS.map((c) => (
+          <div key={c} style={{ width: cellSize, height: cellSize, borderRadius: 2, background: c, border: "1px solid transparent" }} />
         ))}
         <span style={{ fontSize: 9, color: C.dim }}>Много</span>
       </div>

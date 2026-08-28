@@ -70,7 +70,7 @@ export async function GET() {
       };
       send();
       const timer = setInterval(send, 3000);
-      const timeout = setTimeout(() => {
+      setTimeout(() => {
         clearInterval(timer);
         controller.close();
       }, 10 * 60 * 1000);

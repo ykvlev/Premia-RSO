@@ -1,8 +1,9 @@
 "use server";
 
-import { z } from "zod";
 import { db } from "@/lib/db";
 import { auth } from "@/auth";
+import QRCode from "qrcode";
+import { generateTotpSecret, totpUri, verifyTotpCode } from "@/lib/totp";
 
 /** Обновление профиля участника. */
 export async function updateProfile(data: {
@@ -106,5 +107,49 @@ export async function checkProfileComplete(): Promise<{ complete: boolean }> {
     return { complete };
   } catch {
     return { complete: false };
+  }
+}
+
+export async function beginTwoFactorSetup(): Promise<{ ok: boolean; enabled?: boolean; secret?: string; qr?: string; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.email) return { ok: false, error: "Необходима авторизация" };
+  try {
+    const user = await db.user.findUnique({ where: { id: session.user.id }, select: { twoFactorEnabled: true } });
+    if (!user) return { ok: false, error: "Пользователь не найден" };
+    if (user.twoFactorEnabled) return { ok: true, enabled: true };
+    const secret = generateTotpSecret();
+    const qr = await QRCode.toDataURL(totpUri(secret, session.user.email), { width: 220, margin: 1 });
+    await db.user.update({ where: { id: session.user.id }, data: { twoFactorPendingSecret: secret } });
+    return { ok: true, enabled: false, secret, qr };
+  } catch {
+    return { ok: false, error: "Не удалось подготовить 2FA" };
+  }
+}
+
+export async function confirmTwoFactor(code: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Необходима авторизация" };
+  try {
+    const user = await db.user.findUnique({ where: { id: session.user.id }, select: { twoFactorPendingSecret: true } });
+    if (!user?.twoFactorPendingSecret || !verifyTotpCode(user.twoFactorPendingSecret, code)) {
+      return { ok: false, error: "Неверный код. Проверьте время на телефоне и попробуйте снова." };
+    }
+    await db.user.update({ where: { id: session.user.id }, data: { twoFactorEnabled: true, twoFactorSecret: user.twoFactorPendingSecret, twoFactorPendingSecret: null } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Не удалось включить 2FA" };
+  }
+}
+
+export async function disableTwoFactor(code: string): Promise<{ ok: boolean; error?: string }> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Необходима авторизация" };
+  try {
+    const user = await db.user.findUnique({ where: { id: session.user.id }, select: { twoFactorSecret: true } });
+    if (!user?.twoFactorSecret || !verifyTotpCode(user.twoFactorSecret, code)) return { ok: false, error: "Неверный код 2FA" };
+    await db.user.update({ where: { id: session.user.id }, data: { twoFactorEnabled: false, twoFactorSecret: null, twoFactorPendingSecret: null } });
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Не удалось отключить 2FA" };
   }
 }

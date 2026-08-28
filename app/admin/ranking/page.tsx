@@ -19,6 +19,7 @@ export default async function RankingPage() {
   });
 
   const rows = await db.application.findMany({
+    where: { status: { in: ["scoring", "finalist", "winner"] } },
     include: {
       nomination: { select: { id: true } },
       evaluations: { select: { scores: true } },

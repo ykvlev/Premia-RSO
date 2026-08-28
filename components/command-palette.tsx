@@ -194,7 +194,8 @@ export function CommandPalette() {
           }}
         >
           <span style={{ fontSize: 18, opacity: 0.5 }}>🔍</span>
-          <input
+      <input
+        aria-label="Поиск по платформе"
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}

@@ -356,6 +356,12 @@ html, body { max-width: 100%; overflow-x: hidden; }
 
 /* ─── Мобилка: шапка формы заявки (не даём «На сайт» налезать на шаги) ─── */
 @media (max-width: 640px) {
+  .form-two-columns { grid-template-columns: 1fr !important; }
+  .admin-layout-shell { display: block !important; }
+  .admin-app-shell { display: block !important; }
+  .admin-app-sidebar { position: relative !important; width: 100% !important; height: auto !important; border-right: 0 !important; border-bottom: 1px solid #1d1d25 !important; }
+  .admin-detail-grid { grid-template-columns: 1fr !important; padding: 20px 16px !important; gap: 24px !important; }
+  .admin-detail-grid > div:last-child { position: static !important; }
   .apply-topbar { padding-left: 14px !important; padding-right: 14px !important; }
   .apply-back-text { display: none; }
   .apply-step-label { display: none; }

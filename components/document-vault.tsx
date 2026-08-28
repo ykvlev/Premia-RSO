@@ -51,10 +51,11 @@ export function DocumentVault({ attachments }: { attachments: Attachment[] }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       {attachments.map((att) => {
         const icon = getFileIcon(att.filename);
+        const href = /^https?:\/\//i.test(att.url) || att.url.startsWith("/") ? att.url : `/uploads/${att.url}`;
         return (
           <a
             key={att.id}
-            href={att.url}
+            href={href}
             target="_blank"
             rel="noopener noreferrer"
             style={{

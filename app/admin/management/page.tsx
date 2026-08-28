@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function ManagementPage() {
   await requireRole("admin", "superadmin");
 
-  const [apps, nominations, regions, templates, totalCount] = await Promise.all([
+  const [apps, nominations, regions, templates, totalCount, applicationRefs] = await Promise.all([
     db.application.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -21,10 +21,11 @@ export default async function ManagementPage() {
         _count: { select: { evaluations: true } },
       },
     }),
-    db.nomination.findMany({ select: { id: true, title: true } }),
+    db.nomination.findMany({ select: { id: true, title: true, criteria: true } }),
     db.application.findMany({ select: { region: true }, distinct: ["region"], orderBy: { region: "asc" } }),
     db.notificationTemplate.findMany({ orderBy: { createdAt: "desc" } }),
     db.application.count(),
+    db.application.findMany({ select: { id: true, nominationId: true } }),
   ]);
 
   // Jury workload
@@ -32,8 +33,8 @@ export default async function ManagementPage() {
   const allAssignments = await db.juryAssignment.findMany({ select: { juryUserId: true, nominationId: true } });
   const allEvaluations = await db.evaluation.findMany({ select: { juryUserId: true, applicationId: true, scores: true } });
   const allRecusals = await db.juryRecusal.findMany({ select: { juryUserId: true, applicationId: true } });
-  const applicationNomination = new Map(apps.map((a) => [a.id, a.nominationId]));
-  const criteriaByNomination = new Map(apps.map((a) => [a.nominationId, parseCriteria(a.nomination.criteria)]));
+  const applicationNomination = new Map(applicationRefs.map((a) => [a.id, a.nominationId]));
+  const criteriaByNomination = new Map(nominations.map((n) => [n.id, parseCriteria(n.criteria)]));
   const nomCounts = await db.application.groupBy({ by: ["nominationId"], _count: { _all: true } });
   const nomCountMap = new Map(nomCounts.map((n) => [n.nominationId, n._count._all]));
 

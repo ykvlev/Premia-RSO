@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 
 const F = "var(--font-onest), sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -120,8 +120,6 @@ const PAD = 14;
 const COLS = 4;
 const GAP_X = 90;
 const GAP_Y = 50;
-
-const TABLE_COUNTS: Record<string, number> = {};
 
 function calcPositions() {
   const startX = 50;
@@ -318,10 +316,10 @@ function TableCard({
 }
 
 // ─── Relation Line (enhanced) ───────────────────────────────────────────────
-function RelationLine({ rel, fromPos, toPos, highlight, flowColor, animKey }: {
+function RelationLine({ rel, fromPos, toPos, highlight, flowColor }: {
   rel: Relation; fromPos: { x: number; y: number; w: number; h: number };
   toPos: { x: number; y: number; w: number; h: number };
-  highlight: boolean; flowColor?: string; animKey: string;
+  highlight: boolean; flowColor?: string;
 }) {
   const fx = fromPos.x + fromPos.w / 2;
   const fy = fromPos.y + fromPos.h / 2;
@@ -577,7 +575,6 @@ export function DatabaseSchemaViewer({ tables }: { tables?: { name: string; coun
                   key={i} rel={rel} fromPos={fromPos} toPos={toPos}
                   highlight={isRelationHighlighted(rel)}
                   flowColor={flowHighlight?.color}
-                  animKey={`${rel.from}-${rel.to}-${selectedFlow ?? "none"}`}
                 />
               );
             })}

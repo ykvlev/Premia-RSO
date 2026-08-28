@@ -14,6 +14,16 @@ const VALID_STATUS: AppStatus[] = [
   "winner",
   "rejected",
 ];
+const JURY_TRANSITIONS: Record<AppStatus, AppStatus[]> = {
+  new: ["queued", "review", "revision", "rejected"],
+  queued: ["review", "revision", "rejected"],
+  review: ["revision", "scoring", "rejected"],
+  revision: ["review", "rejected"],
+  scoring: ["finalist", "winner", "rejected"],
+  finalist: ["winner", "rejected"],
+  winner: [],
+  rejected: [],
+};
 
 /** Права текущего пользователя (админ — все; жюри — из профиля). */
 async function myPerms(userId: string, role: string) {
@@ -73,11 +83,10 @@ export async function toggleRecusal(applicationId: string) {
     await db.juryRecusal.delete({ where: { id: existing.id } });
     return { ok: true as const, recused: false };
   }
-  await db.juryRecusal.create({ data: { juryUserId, applicationId } });
-  // взял самоотвод — снимаем его оценку, если была
-  await db.evaluation
-    .delete({ where: { applicationId_juryUserId: { applicationId, juryUserId } } })
-    .catch(() => {});
+  await db.$transaction([
+    db.juryRecusal.create({ data: { juryUserId, applicationId } }),
+    db.evaluation.deleteMany({ where: { applicationId, juryUserId } }),
+  ]);
   return { ok: true as const, recused: true };
 }
 
@@ -91,6 +100,11 @@ export async function juryUpdateStatus(applicationId: string, status: string) {
   if (!perms.changeStatus) return { ok: false as const, error: "Нет прав на смену статуса" };
   if (!VALID_STATUS.includes(status as AppStatus)) {
     return { ok: false as const, error: "Неизвестный статус" };
+  }
+  const current = await db.application.findUnique({ where: { id: applicationId }, select: { status: true } });
+  if (!current) return { ok: false as const, error: "Заявка не найдена" };
+  if (current.status !== status && !JURY_TRANSITIONS[current.status].includes(status as AppStatus)) {
+    return { ok: false as const, error: "Недопустимый переход статуса" };
   }
   await db.application.update({
     where: { id: applicationId },
@@ -114,6 +128,11 @@ export async function submitEvaluation(input: {
   if (!(await juryCanAccess(juryUserId, session.user.role, input.applicationId))) {
     return { ok: false as const, error: "Заявка не в вашей номинации" };
   }
+  const recusal = await db.juryRecusal.findUnique({
+    where: { juryUserId_applicationId: { juryUserId, applicationId: input.applicationId } },
+    select: { id: true },
+  });
+  if (recusal) return { ok: false as const, error: "После самоотвода оценка недоступна" };
   const perms = await myPerms(juryUserId, session.user.role);
   if (!perms.score && !perms.comment) {
     return { ok: false as const, error: "Нет прав на оценку" };

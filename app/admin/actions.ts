@@ -180,38 +180,48 @@ export async function updateApplicationStatus(id: string, mockStatus: string) {
   const session = await requireRole("admin", "superadmin");
   const status = MOCK_TO_DB[mockStatus];
   if (!status) return { ok: false as const, error: "Неизвестный статус" };
+  const before = await db.application.findUnique({ where: { id }, select: { status: true } });
+  if (!before) return { ok: false as const, error: "Заявка не найдена" };
+  if (before.status === status) return { ok: true as const, changed: false };
   await db.application.update({ where: { id }, data: { status } });
   await mailStatusUpdate(id, { newStatus: status });
   await logEvent(id, session.user.email ?? "оргкомитет", `Статус → «${STATUS_LABEL_RU[status]}»`);
-  return { ok: true as const };
+  return { ok: true as const, changed: true };
 }
 
 /** Удаление заявки со связанными записями (только admin/superadmin). */
 export async function deleteApplication(id: string) {
   await requireRole("admin", "superadmin");
-  await db.$transaction([
-    db.evaluation.deleteMany({ where: { applicationId: id } }),
-    db.attachment.deleteMany({ where: { applicationId: id } }),
-    db.juryRecusal.deleteMany({ where: { applicationId: id } }),
-    db.applicationComment.deleteMany({ where: { applicationId: id } }),
-    db.applicationEvent.deleteMany({ where: { applicationId: id } }),
-    db.application.delete({ where: { id } }),
-  ]);
-  return { ok: true as const };
+  try {
+    await db.$transaction([
+      db.evaluation.deleteMany({ where: { applicationId: id } }),
+      db.attachment.deleteMany({ where: { applicationId: id } }),
+      db.juryRecusal.deleteMany({ where: { applicationId: id } }),
+      db.applicationComment.deleteMany({ where: { applicationId: id } }),
+      db.applicationEvent.deleteMany({ where: { applicationId: id } }),
+      db.application.delete({ where: { id } }),
+    ]);
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Не удалось удалить заявку" };
+  }
 }
 
 /** Массовая смена статуса (bulk-действия в списке) — с письмами каждому. */
 export async function bulkUpdateStatus(ids: string[], mockStatus: string) {
   const session = await requireRole("admin", "superadmin");
   const status = MOCK_TO_DB[mockStatus];
-  if (!status || ids.length === 0) return { ok: false as const };
-  await db.application.updateMany({ where: { id: { in: ids } }, data: { status } });
+  if (!status || ids.length === 0) return { ok: false as const, error: "Не выбраны заявки или статус" };
+  const rows = await db.application.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } });
+  const changed = rows.filter((row) => row.status !== status);
+  if (changed.length === 0) return { ok: true as const, total: 0, sent: 0, failed: 0 };
+  await db.application.updateMany({ where: { id: { in: changed.map((row) => row.id) } }, data: { status } });
   const actor = session.user.email ?? "оргкомитет";
   await Promise.all([
-    ...ids.map((id) => mailStatusUpdate(id, { newStatus: status })),
-    ...ids.map((id) => logEvent(id, actor, `Статус → «${STATUS_LABEL_RU[status]}» (массово)`)),
+    ...changed.map((row) => mailStatusUpdate(row.id, { newStatus: status })),
+    ...changed.map((row) => logEvent(row.id, actor, `Статус → «${STATUS_LABEL_RU[status]}» (массово)`)),
   ]);
-  return { ok: true as const };
+  return { ok: true as const, total: changed.length, sent: changed.length, failed: 0 };
 }
 
 /**

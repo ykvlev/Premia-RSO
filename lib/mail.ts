@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { db } from "@/lib/db";
 
 /**
  * Почта (SPEC §2: nodemailer через SMTP из .env).
@@ -13,6 +14,14 @@ export async function sendMail(opts: {
   text: string;
   html?: string;
 }): Promise<void> {
+  const writeLog = async (status: "sent" | "failed", error?: string) => {
+    try {
+      await db.emailLog.create({ data: { to: opts.to.slice(0, 320), subject: opts.subject.slice(0, 500), status, error: error?.slice(0, 1000) } });
+    } catch {
+      // Mail delivery must not fail because the audit log is unavailable.
+    }
+  };
+
   if (!useSmtp) {
     console.log(
       [
@@ -29,6 +38,7 @@ export async function sendMail(opts: {
         .filter(Boolean)
         .join("\n"),
     );
+    await writeLog("sent");
     return;
   }
 
@@ -44,11 +54,17 @@ export async function sendMail(opts: {
     },
   });
 
-  await transport.sendMail({
-    from: process.env.SMTP_FROM,
-    to: opts.to,
-    subject: opts.subject,
-    text: opts.text,
-    ...(opts.html ? { html: opts.html } : {}),
-  });
+  try {
+    await transport.sendMail({
+      from: process.env.SMTP_FROM,
+      to: opts.to,
+      subject: opts.subject,
+      text: opts.text,
+      ...(opts.html ? { html: opts.html } : {}),
+    });
+    await writeLog("sent");
+  } catch (error) {
+    await writeLog("failed", error instanceof Error ? error.message : "Unknown SMTP error");
+    throw error;
+  }
 }

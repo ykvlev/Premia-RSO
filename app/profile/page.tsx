@@ -29,6 +29,7 @@ export default async function ProfilePage() {
         vkUrl: true,
         avatarUrl: true,
         emailVerified: true,
+        twoFactorEnabled: true,
       },
     });
   } catch {

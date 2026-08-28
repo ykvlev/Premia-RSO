@@ -10,7 +10,7 @@ export const revalidate = 60;
 
 const DEFAULT_STATS = {
   applications: 128,
-  nominations: 11,
+  nominations: 13,
   regions: 32,
   regionCounts: {} as Record<string, number>,
   startAt: undefined as string | undefined,

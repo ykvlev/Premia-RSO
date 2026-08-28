@@ -123,13 +123,13 @@ export async function submitApplication(formData: FormData): Promise<SubmitResul
   }
 
   // ── 7. Загрузка файлов и создание заявки ──────────────────────────────
-  const attachments: { filename: string; url: string; size: number; mime: string }[] = [];
+  const attachments: { fieldName: string; filename: string; url: string; size: number; mime: string }[] = [];
   for (const { file } of incoming) {
     const safeName = file.name.replace(/[^\w.\-а-яА-ЯёЁ ]/g, "_");
     const key = `applications/${season.year}/${crypto.randomUUID()}/${safeName}`;
     const body = Buffer.from(await file.arrayBuffer());
     await putObject({ key, body, contentType: file.type });
-    attachments.push({ filename: file.name, url: key, size: file.size, mime: file.type });
+    attachments.push({ fieldName: "attachment", filename: file.name, url: key, size: file.size, mime: file.type });
   }
 
   const { consent: _consent, nominationId: _nid, ...commonData } = common.data;
@@ -180,6 +180,29 @@ export async function submitApplication(formData: FormData): Promise<SubmitResul
 export type NomineeResult =
   { ok: true; applicationId: string } | { ok: false; error: string };
 
+function validateDynamicValue(field: FormField, value: string): string | null {
+  if (field.required && !value) return `Заполните поле: ${field.label}`;
+  if (!value) return null;
+  if ((field.type === "text" || field.type === "textarea") && value.length > 2000) {
+    return `Поле «${field.label}» не должно превышать 2000 символов`;
+  }
+  if (field.type === "number" && !Number.isFinite(Number(value))) {
+    return `Поле «${field.label}» должно содержать число`;
+  }
+  if (field.type === "url") {
+    try {
+      const url = new URL(value);
+      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+    } catch {
+      return `Проверьте ссылку в поле «${field.label}»`;
+    }
+  }
+  if (field.type === "select" && !(field.options ?? []).includes(value)) {
+    return `Выберите значение из списка в поле «${field.label}»`;
+  }
+  return null;
+}
+
 /**
  * Отправка заявки из макета-визарда (dark apply-flow): поля номинанта →
  * Application + payload. Фото номинанта → вложение. Обязательные колонки БД,
@@ -202,6 +225,7 @@ export async function submitNomineeApplication(
   if (now > season.endAt) return { ok: false, error: "Приём заявок завершён." };
 
   const g = (k: string) => String(formData.get(k) ?? "").trim();
+  const canonicalEmail = (session?.user?.email ?? g("email")).trim().toLowerCase();
 
   const nomination = await db.nomination.findFirst({
     where: { seasonId: season.id, title: g("nominationTitle") },
@@ -220,16 +244,16 @@ export async function submitNomineeApplication(
   if (!captchaOk) return { ok: false, error: "Проверка капчи не пройдена." };
 
   // Политика почты: только российские / корпоративные адреса (не Gmail и т.п.)
-  const emailPolicy = checkEmailPolicy(g("email"));
+  const emailPolicy = checkEmailPolicy(canonicalEmail);
   if (!emailPolicy.ok) {
     return { ok: false, error: emailPolicy.reason ?? "Недопустимый адрес почты" };
   }
 
   const applicantFio = g("applicantFio");
   const isDynamic = g("dynamic") === "1";
-  const attachments: { filename: string; url: string; size: number; mime: string }[] = [];
+  const attachments: { fieldName: string; filename: string; url: string; size: number; mime: string }[] = [];
 
-  const saveFile = async (file: File, labelForErr: string) => {
+  const saveFile = async (file: File, labelForErr: string, fieldName = "attachment") => {
     if (file.size > uploadConfig.maxFileSizeBytes)
       throw new Error(`Файл «${labelForErr}» больше 10 МБ`);
     if (!isAllowedMime(file.type))
@@ -237,7 +261,7 @@ export async function submitNomineeApplication(
     const safe = file.name.replace(/[^\w.\-а-яА-ЯёЁ ]/g, "_");
     const key = `applications/${season.year}/${crypto.randomUUID()}/${safe}`;
     await putObject({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type });
-    attachments.push({ filename: file.name, url: key, size: file.size, mime: file.type });
+    attachments.push({ fieldName, filename: file.name, url: key, size: file.size, mime: file.type });
   };
 
   let payload: Record<string, unknown>;
@@ -247,6 +271,11 @@ export async function submitNomineeApplication(
   let contactFio: string;
   let position: string | null;
   let nomineeName: string;
+  let accountUserId = userId;
+
+  if (g("consentPersonal") !== "true" || g("consentTerms") !== "true") {
+    return { ok: false, error: "Необходимо принять согласие на обработку данных и условия премии." };
+  }
 
   if (isDynamic) {
     // Официальные поля номинации из formSchema (серверная валидация обязательных).
@@ -260,11 +289,12 @@ export async function submitNomineeApplication(
       for (const f of schemaFields) {
         if (f.type === "file") {
           const file = formData.get(`f_${f.name}`);
-          if (file instanceof File && file.size > 0) await saveFile(file, f.label);
+          if (file instanceof File && file.size > 0) await saveFile(file, f.label, f.name);
           else if (f.required) return { ok: false, error: `Приложите файл: ${f.label}` };
         } else {
           const v = String(formData.get(`f_${f.name}`) ?? "").trim();
-          if (f.required && !v) return { ok: false, error: `Заполните поле: ${f.label}` };
+          const fieldError = validateDynamicValue(f, v);
+          if (fieldError) return { ok: false, error: fieldError };
           p[f.name] = v;
         }
       }
@@ -318,15 +348,15 @@ export async function submitNomineeApplication(
       db.application.create({
         data: {
           nominationId: nomination.id,
-          participantType: g("participantType") || nomination.participantType,
-          userId,
+          participantType: nomination.participantType,
+          userId: accountUserId,
           orgName,
           inn,
           region,
           contactFio,
           position,
           phone: g("phone") || "—",
-          email: g("email") || "—",
+          email: canonicalEmail || "—",
           links: g("links") || null,
           payload: payload as Prisma.InputJsonValue,
           attachments: { create: attachments },
@@ -343,7 +373,7 @@ export async function submitNomineeApplication(
     await db.applicationEvent.create({
       data: {
         applicationId: application.id,
-        actor: g("email") || "аноним",
+        actor: canonicalEmail || "аноним",
         action: `Заявка подана · ${nomination.title}`,
       },
     });
@@ -352,26 +382,36 @@ export async function submitNomineeApplication(
   }
 
   // ── Личный кабинет участника + письмо (падение почты не ломает сабмит) ──
-  const applicantEmail = g("email");
+  const applicantEmail = canonicalEmail;
   const applicantName = g("applicantFio") || "Участник";
   if (applicantEmail.includes("@")) {
     // Первая заявка с этого email → создаём аккаунт участника и высылаем доступ.
     // При повторных заявках аккаунт уже есть — пароль не присылаем.
     let newPassword = "";
-    const existing = await db.user.findUnique({ where: { email: applicantEmail } });
-    if (!existing) {
+    let account = await db.user.findUnique({ where: { email: applicantEmail } });
+    if (!account) {
       const AL = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
       newPassword = Array.from({ length: 12 }, () => AL[crypto.randomInt(AL.length)]).join(
         "",
       );
-      await db.user.create({
-        data: {
-          email: applicantEmail,
-          fio: applicantName,
-          role: "participant",
-          passwordHash: hashSync(newPassword, 10),
-        },
-      });
+      try {
+        account = await db.user.create({
+          data: {
+            email: applicantEmail,
+            fio: applicantName,
+            role: "participant",
+            passwordHash: hashSync(newPassword, 10),
+          },
+        });
+      } catch {
+        // Параллельная заявка могла создать аккаунт между find и create.
+        account = await db.user.findUnique({ where: { email: applicantEmail } });
+        newPassword = "";
+      }
+    }
+    if (account && !accountUserId) {
+      accountUserId = account.id;
+      await db.application.update({ where: { id: application.id }, data: { userId: account.id } });
     }
 
     const lines = [

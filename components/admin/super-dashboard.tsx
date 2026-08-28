@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PerfStats, ErrorEntry } from "@/lib/observability";
-import { clearErrorBuffer, setSeasonActive, toggleMaintenance, getMaintenanceStatus, addIpBan, removeIpBan, getBanList, testIntegrations, sendMassEmail, impersonateUser, forceLogout, unblockUserSession, banUser, resetUserPassword, exportUserData, deleteUser } from "@/app/admin/super/actions";
+import { clearErrorBuffer, setSeasonActive, toggleMaintenance, deleteUser } from "@/app/admin/super/actions";
 import { FeatureFlagsCard } from "@/components/admin/super/feature-flags-card";
 import { AdminProfilesCard } from "@/components/admin/super/admin-profiles-card";
 import { HeatmapCard } from "@/components/admin/super/heatmap-card";
@@ -407,98 +407,6 @@ const exportBtn: React.CSSProperties = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// IP Ban Section
-// ═══════════════════════════════════════════════════════════════════════════
-function IpBanSection({ bans }: { bans: { ip: string; reason: string; bannedBy: string; bannedAt: string }[] }) {
-  const [ip, setIp] = useState("");
-  const [reason, setReason] = useState("");
-  const [list, setList] = useState(bans);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-
-  const doBan = async () => {
-    if (!ip.trim()) return;
-    setBusy(true);
-    setMsg(null);
-    const { addIpBan } = await import("@/app/admin/super/actions");
-    const res = await addIpBan(ip.trim(), reason.trim());
-    setBusy(false);
-    if (res.ok) {
-      setList([...list, { ip: ip.trim(), reason: reason.trim() || "Banned", bannedBy: "superadmin", bannedAt: new Date().toISOString() }]);
-      setIp(""); setReason(""); setMsg("Заблокирован");
-    } else {
-      setMsg(res.error || "Ошибка");
-    }
-  };
-
-  const doUnban = async (bannedIp: string) => {
-    setBusy(true);
-    const { removeIpBan } = await import("@/app/admin/super/actions");
-    const res = await removeIpBan(bannedIp);
-    setBusy(false);
-    if (res.ok) setList(list.filter((b) => b.ip !== bannedIp));
-  };
-
-  return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-        <input
-          placeholder="IP или CIDR (1.2.3.0/24)"
-          value={ip}
-          onChange={(e) => setIp(e.target.value)}
-          style={{ flex: 1, background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: MONO, fontSize: 13 }}
-        />
-        <input
-          placeholder="Причина..."
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          style={{ flex: 1, background: C.card2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 10px", color: C.text, fontFamily: F, fontSize: 13 }}
-        />
-        <button
-          onClick={doBan}
-          disabled={busy || !ip.trim()}
-          style={{
-            background: busy || !ip.trim() ? C.card2 : "#ff3b30",
-            color: busy || !ip.trim() ? C.dim : "#fff",
-            border: `1px solid ${busy || !ip.trim() ? C.border : "#ff3b30"}`,
-            borderRadius: 7,
-            padding: "7px 14px",
-            fontSize: 12.5,
-            fontFamily: F,
-            fontWeight: 700,
-            cursor: busy || !ip.trim() ? "default" : "pointer",
-          }}
-        >
-          + Забанить
-        </button>
-      </div>
-      {msg && <p style={{ color: msg.includes("Ошибка") ? C.red : C.green, fontSize: 12, margin: "0 0 8px" }}>{msg}</p>}
-      {list.length === 0 ? (
-        <p style={{ color: C.muted, fontSize: 12.5, fontStyle: "italic" }}>Нет забаненных IP</p>
-      ) : (
-        <Scroll max={220}>
-          {list.map((b) => (
-            <div key={b.ip} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
-              <div>
-                <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{b.ip}</span>
-                <span style={{ color: C.muted, fontSize: 11, marginLeft: 8 }}>{b.reason}</span>
-              </div>
-              <button
-                onClick={() => doUnban(b.ip)}
-                disabled={busy}
-                style={{ background: "none", color: C.green, border: "none", fontSize: 12, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
-              >
-                Убрать
-              </button>
-            </div>
-          ))}
-        </Scroll>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
 // Integration Test Card
 // ═══════════════════════════════════════════════════════════════════════════
 function IntegrationTestCard() {
@@ -766,89 +674,6 @@ function ImpersonationCard({ users }: { users: { id: string; fio: string; email:
         </button>
       </div>
       {error && <p style={{ color: C.red, fontSize: 12, marginTop: 8 }}>{error}</p>}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// Sessions Card — активные сессии + force-logout
-// ═══════════════════════════════════════════════════════════════════════════
-function SessionsCard({ sessions }: { sessions: { id: string; email: string; userId: string | null; role: string | null; ip: string | null; userAgent: string | null; loginAt: string; blocked: boolean }[] }) {
-  const [list, setList] = useState(sessions);
-  const [busy, setBusy] = useState(false);
-
-  const doForceLogout = async (userId: string) => {
-    if (!userId || busy) return;
-    setBusy(true);
-    const { forceLogout } = await import("@/app/admin/super/actions");
-    const res = await forceLogout(userId, "Force logout");
-    setBusy(false);
-    if (res.ok) {
-      setList(list.map((s) => s.userId === userId ? { ...s, blocked: true } : s));
-    }
-  };
-
-  const doUnblock = async (userId: string) => {
-    if (!userId || busy) return;
-    setBusy(true);
-    const { unblockUserSession } = await import("@/app/admin/super/actions");
-    await unblockUserSession(userId);
-    setBusy(false);
-    setList(list.map((s) => s.userId === userId ? { ...s, blocked: false } : s));
-  };
-
-  const parseUA = (ua: string | null) => {
-    if (!ua) return "—";
-    if (ua.includes("Chrome")) return "Chrome";
-    if (ua.includes("Firefox")) return "Firefox";
-    if (ua.includes("Safari")) return "Safari";
-    if (ua.includes("Edge")) return "Edge";
-    return ua.slice(0, 30);
-  };
-
-  return (
-    <div>
-      {list.length === 0 ? (
-        <p style={{ color: C.muted, fontSize: 12.5, fontStyle: "italic" }}>Нет активных сессий (за 2ч)</p>
-      ) : (
-        <Scroll max={280}>
-          {list.map((s) => (
-            <div key={s.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
-              <div style={{ width: 10, height: 10, borderRadius: "50%", background: s.blocked ? "#ff3b30" : C.green, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, fontFamily: F, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {s.email}
-                  <span style={{ color: C.dim, fontSize: 11, fontWeight: 400, marginLeft: 6 }}>{s.role}</span>
-                </div>
-                <div style={{ fontSize: 11, color: C.dim, fontFamily: MONO, display: "flex", gap: 12 }}>
-                  <span>{s.ip ?? "—"}</span>
-                  <span>{parseUA(s.userAgent)}</span>
-                  <span>{new Date(s.loginAt).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
-                </div>
-              </div>
-              {s.userId && (
-                s.blocked ? (
-                  <button
-                    onClick={() => doUnblock(s.userId!)}
-                    disabled={busy}
-                    style={{ background: "none", color: C.green, border: `1px solid ${C.green}44`, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    Разблок.
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => doForceLogout(s.userId!)}
-                    disabled={busy}
-                    style={{ background: "none", color: "#ff3b30", border: `1px solid #ff3b3044`, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontFamily: F, fontWeight: 600, cursor: "pointer" }}
-                  >
-                    Kick
-                  </button>
-                )
-              )}
-            </div>
-          ))}
-        </Scroll>
-      )}
     </div>
   );
 }

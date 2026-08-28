@@ -27,7 +27,8 @@ export function AdminLayoutShell({
   if (standalone) return <>{children}</>;
 
   return (
-    <div
+      <div
+        className="admin-layout-shell"
       style={{
         minHeight: "100vh",
         background: "#08080a",

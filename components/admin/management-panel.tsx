@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { parseCriteria, calcTotal } from "@/lib/scoring";
 
 const F = "var(--font-onest), sans-serif";
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
@@ -252,7 +253,7 @@ export function ManagementPanel({
                   {tlData.evaluations?.length === 0 && <p style={{ color: C.dim, fontSize: 12 }}>Нет оценок</p>}
                   {tlData.evaluations?.map((e: any, i: number) => {
                     const scores = (e.scores ?? {}) as Record<string, number>;
-                    const total = Object.values(scores).reduce((s, v) => s + (Number(v) || 0), 0);
+                    const total = calcTotal(scores, parseCriteria(tlData.app?.criteria));
                     return (
                       <div key={i} style={{ padding: "8px 0", borderBottom: "1px solid " + C.border }}>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>

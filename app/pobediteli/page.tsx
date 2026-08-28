@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
+import { getDownloadUrl } from "@/lib/storage";
 
 export const metadata: Metadata = {
   title: "Зал славы",
@@ -18,7 +19,7 @@ const STATUS: Record<string, { label: string; color: string }> = {
 /** Публичный «Зал славы» — финалисты и победители сезона. */
 export default async function HallPage() {
   const rows = await db.application.findMany({
-    where: { status: { in: ["winner", "finalist"] } },
+    where: { status: { in: ["winner", "finalist"] }, nomination: { season: { isActive: true } } },
     include: {
       nomination: { select: { title: true } },
       attachments: { take: 1 },
@@ -26,7 +27,10 @@ export default async function HallPage() {
     orderBy: { createdAt: "asc" },
   });
   // Победители — впереди финалистов.
-  const apps = [...rows].sort(
+  const apps = (await Promise.all(rows.map(async (row) => ({
+    ...row,
+    photoUrl: row.attachments[0] ? await getDownloadUrl(row.attachments[0].url) : undefined,
+  })))).sort(
     (a, b) => (a.status === "winner" ? 0 : 1) - (b.status === "winner" ? 0 : 1),
   );
 
@@ -132,7 +136,7 @@ export default async function HallPage() {
               const st = STATUS[a.status] ?? STATUS.finalist;
               const name =
                 (a.payload as { nomineeFio?: string } | null)?.nomineeFio || a.contactFio;
-              const photo = a.attachments[0]?.url;
+              const photo = a.photoUrl;
               return (
                 <div
                   key={a.id}
@@ -156,7 +160,7 @@ export default async function HallPage() {
                     {photo ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={`/uploads/${photo}`}
+                        src={photo}
                         alt={name}
                         style={{
                           width: "100%",

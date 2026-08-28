@@ -29,15 +29,15 @@ export default async function CertificatePage({
 
   const app = await db.application.findUnique({
     where: { id },
-    include: { nomination: { select: { title: true } } },
+    include: { nomination: { select: { title: true, season: { select: { year: true } } } } },
   });
   if (!app) notFound();
 
   const role = session.user.role;
-  const isStaff = role === "admin" || role === "superadmin" || role === "jury";
+  const isStaff = role === "admin" || role === "superadmin";
   const isOwner =
-    !!session.user.email &&
-    session.user.email.toLowerCase() === app.email.toLowerCase();
+    app.userId === session.user.id ||
+    (!!session.user.email && session.user.email.toLowerCase() === app.email.toLowerCase());
   if (!isStaff && !isOwner) notFound();
 
   const cert = CERT[app.status];
@@ -71,7 +71,7 @@ export default async function CertificatePage({
   const p = (app.payload ?? {}) as Record<string, unknown>;
   const name =
     (typeof p.nomineeFio === "string" && p.nomineeFio) || app.contactFio || app.orgName;
-  const year = app.createdAt.getFullYear();
+  const year = app.nomination.season.year;
 
   // QR со ссылкой на публичную проверку подлинности сертификата.
   const site = (process.env.NEXTAUTH_URL || "https://премиятрудкрут.рф").replace(/\/+$/, "");

@@ -28,7 +28,7 @@ export async function getJuryWorkload() {
   });
 
   const recusals = await db.juryRecusal.findMany({
-    select: { juryUserId: true, applicationId: true },
+    select: { juryUserId: true, applicationId: true, application: { select: { nominationId: true } } },
   });
 
   // Get application count per nomination for assignment mapping
@@ -44,7 +44,7 @@ export async function getJuryWorkload() {
       .reduce((sum, a) => sum + (nomCountMap.get(a.nominationId) ?? 0), 0);
     const assignedNomIds = new Set(assignments.filter((a) => a.juryUserId === u.id).map((a) => a.nominationId));
     const userEvaluations = evaluations.filter((e) => e.juryUserId === u.id && assignedNomIds.has((e as any).application.nomination.id));
-    const userRecusals = recusals.filter((r) => r.juryUserId === u.id);
+    const userRecusals = recusals.filter((r) => r.juryUserId === u.id && assignedNomIds.has(r.application.nominationId));
     const evaluated = userEvaluations.length;
     const recused = userRecusals.length;
     const scores = userEvaluations.map((e) => calcTotal((e.scores ?? {}) as Record<string, number>, parseCriteria(e.application.nomination.criteria)));
@@ -107,11 +107,11 @@ export async function getApplicationTimeline(applicationId: string) {
 
   const app = await db.application.findUnique({
     where: { id: applicationId },
-    select: { createdAt: true, status: true, contactFio: true },
+    select: { createdAt: true, status: true, contactFio: true, nomination: { select: { criteria: true } } },
   });
 
   return {
-    app: app ? { contactFio: app.contactFio, status: app.status, createdAt: app.createdAt.toISOString() } : null,
+    app: app ? { contactFio: app.contactFio, status: app.status, createdAt: app.createdAt.toISOString(), criteria: app.nomination.criteria } : null,
     events: events.map((e) => ({
       id: e.id, actor: e.actor, action: e.action, at: e.createdAt.toISOString(), type: "event" as const,
     })),
@@ -173,7 +173,6 @@ export async function exportApplicationsToExcel(filters: {
   });
 
   // ── Title row ──────────────────────────────────────────────────────────
-  ws.mergeCells("A1:R1");
   const titleCell = ws.getCell("A1");
   titleCell.value = `Национальная премия «Труд Крут» — Заявки (${apps.length} шт.)`;
   titleCell.font = { name: "Calibri", size: 14, bold: true, color: { argb: "FF0804FF" } };
@@ -199,12 +198,19 @@ export async function exportApplicationsToExcel(filters: {
     { header: "Дата подачи", key: "createdAt", width: 14 },
   ];
 
-  // Add criteria columns from first nomination
-  const firstNom = apps[0]?.nomination;
-  const critDefs = ((firstNom?.criteria ?? []) as { key: string; label: string; maxScore?: number }[]) || [];
+  // Собираем критерии всех номинаций: у разных номинаций свои labels, c1 не общий.
+  const critDefs = Array.from(
+    new Map(
+      apps.flatMap((a) => parseCriteria(a.nomination.criteria).map((c) => [
+        `${a.nomination.id}:${c.key}`,
+        { nominationId: a.nomination.id, key: c.key, label: `${a.nomination.title}: ${c.label}`, maxScore: c.maxScore },
+      ] as const)),
+    ).values(),
+  );
   for (const c of critDefs) {
-    columns.push({ header: c.label, key: `crit_${c.key}`, width: Math.max(14, c.label.length + 4) });
+    columns.push({ header: c.label, key: `crit_${c.nominationId}_${c.key}`, width: Math.max(14, Math.min(40, c.label.length + 4)) });
   }
+  ws.mergeCells(1, 1, 1, columns.length);
 
   ws.columns = columns;
 
@@ -247,7 +253,11 @@ export async function exportApplicationsToExcel(filters: {
 
     // Criteria scores
     for (const c of critDefs) {
-      const key = `crit_${c.key}`;
+      const key = `crit_${c.nominationId}_${c.key}`;
+      if (c.nominationId !== a.nomination.id) {
+        rowData[key] = "";
+        continue;
+      }
       const scores = a.evaluations.map((e: any) => {
         const s = (e.scores ?? {}) as Record<string, number>;
         return Number(s[c.key]) || 0;

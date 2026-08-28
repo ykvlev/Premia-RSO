@@ -38,7 +38,17 @@ export const commonFieldsSchema = z.object({
     .trim()
     .regex(/^\+?[0-9\s()-]{10,18}$/, "Проверьте формат телефона"),
   email: z.email("Проверьте формат email"),
-  links: z.string().trim().optional(),
+  links: z.string().trim().refine(
+    (value) => !value || value.split(/\r?\n/).filter(Boolean).every((link) => {
+      try {
+        const url = new URL(link);
+        return url.protocol === "http:" || url.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }),
+    "Ссылки должны начинаться с http:// или https://",
+  ).optional(),
   consent: z.literal(true, {
     error: "Необходимо согласие на обработку персональных данных",
   }),

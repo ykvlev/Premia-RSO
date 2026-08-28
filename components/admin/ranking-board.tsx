@@ -10,8 +10,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  Legend,
-  Treemap,
 } from "recharts";
 
 const F = "var(--font-onest), sans-serif";

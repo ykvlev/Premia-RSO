@@ -47,7 +47,7 @@ export function StatusCheck() {
           <input
             value={number}
             onChange={(e) => setNumber(e.target.value)}
-            placeholder="например, a1b2c3"
+            placeholder="например, cmm1..."
             style={input}
           />
         </div>

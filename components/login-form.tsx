@@ -19,6 +19,7 @@ export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -27,7 +28,7 @@ export function LoginForm() {
     setPending(true);
     setError(null);
 
-    const res = await signIn("credentials", { redirect: false, email: email.trim().toLowerCase(), password });
+    const res = await signIn("credentials", { redirect: false, email: email.trim().toLowerCase(), password, twoFactorCode });
 
     if (!res || res.error) {
       setError("Неверный email или пароль");
@@ -104,6 +105,18 @@ export function LoginForm() {
           Забыли пароль?
         </a>
       </div>
+
+      <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <span style={labelStyle}>Код 2FA (если включена)</span>
+        <input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          value={twoFactorCode}
+          onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          placeholder="6 цифр из приложения-аутентификатора"
+          style={inputStyle}
+        />
+      </label>
 
       {error && (
         <div

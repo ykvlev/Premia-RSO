@@ -25,7 +25,6 @@ const RL_WINDOW_MS = 15 * 60_000; // 15 минут
 
 // ── Схемы ──────────────────────────────────────────────────────────────────
 const emailSchema = z.email();
-const codeSchema = z.string().length(CODE_LENGTH);
 const passwordSchema = z.string().min(8).max(128);
 
 function generateCode(): string {
@@ -124,6 +123,10 @@ export async function verifyCode(
   code: string,
 ): Promise<{ ok: boolean; error?: string; token?: string }> {
   const email = emailRaw.trim().toLowerCase();
+
+  if (!rateLimit(`reg:verify:email:${email}`, 10, RL_WINDOW_MS) || !rateLimit(`reg:verify:ip:${getIp() ?? "unknown"}`, 20, RL_WINDOW_MS)) {
+    return { ok: false, error: "Слишком много попыток. Запросите новый код позже." };
+  }
 
   if (code.length !== CODE_LENGTH || !/^\d{6}$/.test(code)) {
     return { ok: false, error: "Код должен содержать 6 цифр" };

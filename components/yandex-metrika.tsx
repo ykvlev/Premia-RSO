@@ -8,7 +8,7 @@ export function YandexMetrika() {
   useEffect(() => {
     if (!YM_ID || typeof window === "undefined") return;
 
-    (function (w: Window, d: Document, o: string, c: string) {
+    (function (w: Window, d: Document, o: string) {
       (w as any)[o] = (w as any)[o] || function () {
         ((w as any)[o].q = (w as any)[o].q || []).push(arguments);
       };
@@ -17,7 +17,7 @@ export function YandexMetrika() {
       s.src = `https://mc.yandex.ru/metrika/tag.js`;
       const insertPoint = d.getElementsByTagName("script")[0];
       insertPoint?.parentNode?.insertBefore(s, insertPoint);
-    })(window, document, "ym", "ymdata");
+    })(window, document, "ym");
 
     // Init call
     (window as any).ym?.(Number(YM_ID), "init", {

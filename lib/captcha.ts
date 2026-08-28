@@ -5,7 +5,8 @@
  */
 export async function verifyCaptcha(token: string | undefined): Promise<boolean> {
   const serverKey = process.env.SMARTCAPTCHA_SERVER_KEY;
-  if (!serverKey) return true; // заглушка
+  // В production отсутствие секретного ключа не должно отключать защиту.
+  if (!serverKey) return process.env.NODE_ENV !== "production";
 
   if (!token) return false;
 

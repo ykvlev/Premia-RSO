@@ -63,17 +63,19 @@ import { ProtocolPDFButton } from "./protocol-pdf";
 
 // ─── Nominations ──────────────────────────────────────────────────────────────
 const NOMINATIONS_LIST = [
-  { id: "01", title: "Лучший боец студенческого отряда" },
-  { id: "02", title: "Лучшие СМИ о студенческих отрядах" },
-  { id: "03", title: "Лучший вуз-партнёр" },
-  { id: "04", title: "Лучший ссуз-партнёр" },
-  { id: "05", title: "Лучшее региональное отделение РСО" },
-  { id: "06", title: "Лучшее содействие органов власти" },
-  { id: "07", title: "Наставник года" },
-  { id: "08", title: "Лучший работодатель" },
-  { id: "09", title: "Лучший социальный партнёр" },
-  { id: "10", title: "Лучший проект регионального отделения" },
-  { id: "11", title: "Лучший штаб регионального отделения" },
+  { id: "01", title: "Лучший работодатель по трудоустройству несовершеннолетней молодёжи" },
+  { id: "02", title: "Лучший работодатель по организации безопасных условий труда" },
+  { id: "03", title: "Лучшая практика в вузе" },
+  { id: "04", title: "Лучшая практика в профессиональной и общеобразовательной организации" },
+  { id: "05", title: "Работа СО смыслом" },
+  { id: "06", title: "Лучший региональный совет ветеранов" },
+  { id: "07", title: "Герой РСО" },
+  { id: "08", title: "Лидер РСО" },
+  { id: "09", title: "Лучший орган исполнительной власти по поддержке и развитию студотрядов" },
+  { id: "10", title: "Лучшая практика поддержки трудовых отрядов подростков" },
+  { id: "11", title: "Мастер слова «Событие года»" },
+  { id: "12", title: "Мастер слова «Событие РСО в региональном аспекте»" },
+  { id: "13", title: "Едины делом: Трудовой сезон РСО в объективе" },
 ];
 
 // ─── Criteria ─────────────────────────────────────────────────────────────────
@@ -690,8 +692,8 @@ const SAMPLE: Application[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const F = "var(--font-onest), sans-serif";
-const calcTotal = (s: ScoreItem[]) => s.reduce((a, c) => a + (c.value ?? 0), 0);
-const calcMax = (s: ScoreItem[]) => s.reduce((a, c) => a + c.max, 0);
+const calcTotal = (s: ScoreItem[]) => s.reduce((a, c) => a + (c.value ?? 0) * (c.weight ?? 1), 0);
+const calcMax = (s: ScoreItem[]) => s.reduce((a, c) => a + c.max * (c.weight ?? 1), 0);
 const CHART_COLORS = [
   "#0804ff",
   "#f59e0b",
@@ -1989,10 +1991,10 @@ function CompareView({
   apps: Application[];
   onOpen: (id: string) => void;
 }) {
-  const [nomFilter, setNomFilter] = useState("01");
+  const [nomFilter, setNomFilter] = useState(apps[0]?.nomination ?? "");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
 
-  const criteria = CRITERIA[nomFilter] ?? [];
+  const criteria = apps.find((a) => a.nomination === nomFilter)?.scores ?? [];
   const maxTotal = criteria.reduce((s, c) => s + c.max, 0);
 
   const list = useMemo(() => {
@@ -2045,9 +2047,9 @@ function CompareView({
             minWidth: 300,
           }}
         >
-          {NOMINATIONS_LIST.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.id} — {n.title}
+          {Array.from(new Map(apps.map((a) => [a.nomination, a.nominationTitle])).entries()).map(([id, title]) => (
+            <option key={id} value={id}>
+              {title}
             </option>
           ))}
         </select>
@@ -2352,11 +2354,13 @@ function DashboardView({ apps }: { apps: Application[] }) {
 
   const byNom = useMemo(
     () =>
-      NOMINATIONS_LIST.map((n) => ({
-        name: n.id,
-        label: n.title,
-        count: filteredApps.filter((a) => a.nomination === n.id).length,
-      })).filter((d) => d.count > 0),
+      Array.from(new Map(filteredApps.map((a) => [a.nomination, a.nominationTitle])).entries())
+        .map(([name, label]) => ({
+          name,
+          label,
+          count: filteredApps.filter((a) => a.nomination === name).length,
+        }))
+        .filter((d) => d.count > 0),
     [filteredApps],
   );
 
@@ -2970,6 +2974,7 @@ function ListView({
   const [pageSize, setPageSize] = useState(10);
   const [bulkStatus, setBulkStatus] = useState<AppStatus>("review");
   const [showBulkMenu, setShowBulkMenu] = useState(false);
+  const nominationOptions = Array.from(new Map(apps.map((a) => [a.nomination, a.nominationTitle])).entries());
 
   const filtered = useMemo(() => {
     let list = [...apps];
@@ -3234,9 +3239,9 @@ function ListView({
                   }}
                 >
                   <option value="all">Все номинации</option>
-                  {NOMINATIONS_LIST.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.id} — {n.title}
+                  {nominationOptions.map(([id, title]) => (
+                    <option key={id} value={id}>
+                      {title}
                     </option>
                   ))}
                 </select>
@@ -3891,6 +3896,7 @@ function Sidebar({
 
   return (
     <aside
+      className="admin-app-sidebar"
       style={{
         background: "#0d0d11",
         borderRight: "1px solid #1d1d25",
@@ -3968,6 +3974,7 @@ function Sidebar({
       </a>
 
       <div
+        className="admin-detail-grid"
         style={{
           display: "flex",
           alignItems: "center",
@@ -4071,7 +4078,11 @@ export function AdminApp({ initialApps, currentUser }: AdminAppProps) {
   }, []);
 
   const saveApp = useCallback((updated: Application, andBack = true) => {
-    setApps((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    let previous: Application | undefined;
+    setApps((prev) => prev.map((a) => {
+      if (a.id === updated.id) { previous = a; return updated; }
+      return a;
+    }));
     if (andBack) setView("list");
     // Персист статуса + комментария + заметки; письма заявителю — в server action.
     void saveApplication(
@@ -4079,18 +4090,50 @@ export function AdminApp({ initialApps, currentUser }: AdminAppProps) {
       updated.status,
       updated.expertComment ?? "",
       updated.internalNote ?? "",
-    );
+    ).then((result) => {
+      if (!result.ok) {
+        if (previous) setApps((prev) => prev.map((a) => a.id === updated.id ? previous! : a));
+        window.alert(result.error || "Не удалось сохранить заявку");
+      }
+    }).catch(() => {
+      if (previous) setApps((prev) => prev.map((a) => a.id === updated.id ? previous! : a));
+      window.alert("Ошибка сети при сохранении заявки");
+    });
   }, []);
 
   const deleteApp = useCallback((id: string) => {
-    setApps((prev) => prev.filter((a) => a.id !== id));
+    let deleted: Application | undefined;
+    setApps((prev) => {
+      deleted = prev.find((a) => a.id === id);
+      return prev.filter((a) => a.id !== id);
+    });
     setView("list");
-    void deleteApplication(id);
+    void deleteApplication(id).then((result) => {
+      if (!result.ok && deleted) {
+        setApps((prev) => [...prev, deleted!]);
+        window.alert(result.error || "Не удалось удалить заявку");
+      }
+    }).catch(() => {
+      if (deleted) setApps((prev) => [...prev, deleted!]);
+      window.alert("Ошибка сети при удалении заявки");
+    });
   }, []);
 
   const bulkUpdate = useCallback((ids: string[], status: AppStatus) => {
-    setApps((prev) => prev.map((a) => (ids.includes(a.id) ? { ...a, status } : a)));
-    void bulkUpdateStatus(ids, status);
+    const previous: Application[] = [];
+    setApps((prev) => prev.map((a) => {
+      if (ids.includes(a.id)) { previous.push(a); return { ...a, status }; }
+      return a;
+    }));
+    void bulkUpdateStatus(ids, status).then((result) => {
+      if (!result.ok) {
+        setApps((prev) => prev.map((a) => previous.find((old) => old.id === a.id) ?? a));
+        window.alert(result.error || "Не удалось обновить заявки");
+      }
+    }).catch(() => {
+      setApps((prev) => prev.map((a) => previous.find((old) => old.id === a.id) ?? a));
+      window.alert("Ошибка сети при массовом обновлении");
+    });
   }, []);
 
   const NAV: { key: View; label: string; icon: React.ReactNode }[] = [
@@ -4103,7 +4146,7 @@ export function AdminApp({ initialApps, currentUser }: AdminAppProps) {
   const newCount = apps.filter((a) => a.status === "new").length;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#08080a", fontFamily: F, display: "grid", gridTemplateColumns: "236px 1fr" }}>
+    <div className="admin-app-shell" style={{ minHeight: "100vh", background: "#08080a", fontFamily: F, display: "grid", gridTemplateColumns: "236px 1fr" }}>
       <Sidebar
         view={view}
         setView={setView}

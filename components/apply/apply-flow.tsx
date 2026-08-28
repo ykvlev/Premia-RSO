@@ -2048,7 +2048,15 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                         onChange={(v) => set("consentPersonal", v)}
                       >
                         Я даю согласие на обработку персональных данных с целью участия в
-                        Конкурсе и/или обеспечения участия лица, мною заявляемого.{" "}
+                        Конкурсе и/или обеспечения участия лица, мною заявляемого. {" "}
+                        <a
+                          href="/consent"
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#c7c7ff", textDecoration: "underline", textUnderlineOffset: 2 }}
+                        >
+                          Согласие на обработку персональных данных
+                        </a>
                         <span style={{ color: "#ff6b6b" }}>*</span>
                       </Checkbox>
                     </div>
@@ -2058,8 +2066,24 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                         onChange={(v) => set("consentTerms", v)}
                       >
                         Подтверждаю, что ознакомлен и принимаю условия Положения о Конкурсе,
-                        Политики обработки персональных данных, Пользовательского
-                        соглашения. <span style={{ color: "#ff6b6b" }}>*</span>
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#c7c7ff", textDecoration: "underline", textUnderlineOffset: 2 }}
+                        >
+                          Пользовательского соглашения
+                        </a>
+                        ,
+                        <a
+                          href="/cookie"
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: "#c7c7ff", textDecoration: "underline", textUnderlineOffset: 2 }}
+                        >
+                          Политики cookie
+                        </a>
+                        . <span style={{ color: "#ff6b6b" }}>*</span>
                       </Checkbox>
                     </div>
                     <Checkbox

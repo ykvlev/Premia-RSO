@@ -31,7 +31,6 @@ function timeAgo(dateStr: string): string {
   if (mins < 60) return `${mins} мин. назад`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours} ч. назад`;
-  const days = Math.floor(hours / 24);
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -39,12 +38,10 @@ export function ApplicationComments({
   comments,
   applicationId,
   userRole,
-  userName,
 }: {
   comments: Comment[];
   applicationId: string;
   userRole: string;
-  userName: string;
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -183,7 +180,12 @@ export function ApplicationComments({
           gap: 8,
         }}
       >
+        <label htmlFor={`comment-${applicationId}`} style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}>
+          Комментарий к заявке
+        </label>
         <input
+          id={`comment-${applicationId}`}
+          aria-label="Комментарий к заявке"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

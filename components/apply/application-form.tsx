@@ -295,7 +295,7 @@ export function ApplicationForm({ nominations }: { nominations: NominationOption
               className="underline underline-offset-2"
               target="_blank"
             >
-              Политикой конфиденциальности
+              Пользовательским соглашением
             </Link>
             . <span className="text-[color:var(--color-primary)]">*</span>
           </span>

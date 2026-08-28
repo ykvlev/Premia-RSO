@@ -15,8 +15,6 @@ type JuryData = {
   avgScore: number | null;
 };
 
-const SCORE_COLORS = ["#ff6b6b", "#f5a623", "#e0703a", "#f5c518", "#5b8def", "#8a5cf6", "#2fbf6b"];
-
 function scoreColor(score: number | null): string {
   if (score === null) return C.dim;
   if (score >= 80) return C.green;
@@ -31,11 +29,9 @@ export function JuryChartsCard({ data }: { data: JuryData[] }) {
   }
 
   const maxAssigned = Math.max(1, ...data.map((j) => j.assigned));
-  const maxEvaluated = Math.max(1, ...data.map((j) => j.evaluated));
 
   const totalAssigned = data.reduce((s, j) => s + j.assigned, 0);
   const totalEvaluated = data.reduce((s, j) => s + j.evaluated, 0);
-  const totalRecused = data.reduce((s, j) => s + j.recused, 0);
   const avgCompletion = totalAssigned > 0 ? Math.round((totalEvaluated / totalAssigned) * 100) : 0;
 
   const sorted = [...data].sort((a, b) => (b.avgScore ?? 0) - (a.avgScore ?? 0));

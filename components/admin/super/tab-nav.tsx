@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 const F = "var(--font-onest), sans-serif";
 
 export type Tab = {

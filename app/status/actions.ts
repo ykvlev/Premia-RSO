@@ -17,8 +17,8 @@ const LABEL: Record<AppStatus, string> = {
 };
 
 /**
- * Проверка статуса заявки без входа: по номеру (последние 6 символов, как в
- * кабинете) + email заявителя. Возвращает статус и номинацию, если совпало.
+ * Проверка статуса заявки без входа: по полному номеру из письма/кабинета
+ * и email заявителя. Полный cuid не позволяет перебором раскрыть чужой статус.
  */
 export async function checkApplicationStatus(input: { number: string; email: string }) {
   // Антиперебор: не более 15 проверок с одного IP в минуту.
@@ -26,16 +26,16 @@ export async function checkApplicationStatus(input: { number: string; email: str
     return { ok: false as const, error: "Слишком много запросов. Попробуйте через минуту." };
   }
 
-  const number = input.number.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+  const number = input.number.trim();
   const email = input.email.trim().toLowerCase();
-  if (number.length < 4 || !email.includes("@")) {
+  if (number.length < 20 || !/^[a-z0-9]+$/i.test(number) || !email.includes("@")) {
     return { ok: false as const, error: "Укажите номер заявки и email" };
   }
 
   const app = await db.application.findFirst({
     where: {
       email: { equals: email, mode: "insensitive" },
-      id: { endsWith: number },
+      id: number,
     },
     include: { nomination: { select: { title: true } } },
   });

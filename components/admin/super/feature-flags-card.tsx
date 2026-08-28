@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 
 interface Flag {
   id: string;
@@ -12,7 +11,6 @@ interface Flag {
 }
 
 export function FeatureFlagsCard() {
-  const router = useRouter();
   const [flags, setFlags] = useState<Flag[]>([]);
   const [loading, setLoading] = useState(true);
   const [newKey, setNewKey] = useState("");

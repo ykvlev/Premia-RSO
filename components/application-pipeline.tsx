@@ -1,7 +1,5 @@
 "use client";
 
-const F = "var(--font-onest), sans-serif";
-
 const STAGES = [
   { key: "new", label: "Отправлена", icon: "📨" },
   { key: "queued", label: "Ожидает", icon: "⏳" },

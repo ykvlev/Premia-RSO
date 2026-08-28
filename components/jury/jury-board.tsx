@@ -232,6 +232,9 @@ function JuryCard({ item, perms }: { item: JuryItem; perms: JuryPerms }) {
                   </span>
                 </div>
                 <input
+                  id={`score-${item.id}-${c.key}`}
+                  aria-label={`${c.label}, от 1 до ${c.max} баллов`}
+                  aria-valuetext={`${scores[c.key] ?? 1} из ${c.max}`}
                   type="range"
                   min={1}
                   max={c.max}
@@ -422,7 +425,12 @@ export function JuryBoard({ items, perms }: { items: JuryItem[]; perms: JuryPerm
       </div>
       <p style={{ color: "#6a6a72", fontSize: 12, fontFamily: F, marginBottom: 10 }}>Найдено {filtered.length} из {items.length}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {filtered.map((it) => (
+        {filtered.length === 0 ? (
+          <div style={{ border: "1px solid #2a2a32", borderRadius: 12, padding: "28px 20px", textAlign: "center", color: "#9a9aa4", fontFamily: F, fontSize: 14 }}>
+            По заданным фильтрам ничего не найдено.
+            <button type="button" onClick={() => { setQuery(""); setRegionFilter(""); }} style={{ display: "block", margin: "12px auto 0", background: "transparent", border: "1px solid #2a2a32", borderRadius: 999, color: "#9da0ff", padding: "7px 14px", fontFamily: F, cursor: "pointer" }}>Сбросить фильтры</button>
+          </div>
+        ) : filtered.map((it) => (
           <JuryCard key={it.id} item={it} perms={perms} />
         ))}
       </div>

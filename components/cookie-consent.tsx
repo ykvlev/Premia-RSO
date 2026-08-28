@@ -259,8 +259,13 @@ function Toggle({
         </span>
         <span style={{ color: "#6a6a72", fontSize: 12, fontFamily: F }}>{hint}</span>
       </span>
-      <span
-        onClick={() => !disabled && onChange?.(!checked)}
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => onChange?.(!checked)}
         style={{
           flexShrink: 0,
           width: 40,
@@ -280,10 +285,10 @@ function Toggle({
             height: 18,
             borderRadius: "50%",
             background: "#fff",
-            transition: "left 0.15s",
+          transition: "left 0.15s",
           }}
         />
-      </span>
+      </button>
     </label>
   );
 }

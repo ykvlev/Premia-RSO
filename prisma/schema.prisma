@@ -43,11 +43,15 @@ model User {
   avatarUrl     String?
   passwordHash  String
   emailVerified DateTime?
+  twoFactorEnabled Boolean        @default(false)
+  twoFactorSecret String?
+  twoFactorPendingSecret String?
   role          Role             @default(participant)
   permissions   Json? // права жюри: {score, comment, changeStatus, viewContacts}
   applications  Application[]
   evaluations   Evaluation[]
   assignments   JuryAssignment[]
+  recusals      JuryRecusal[]   @relation("JuryRecusalUser")
   notifications Notification[]
   createdAt     DateTime         @default(now())
 }
@@ -80,7 +84,7 @@ model Application {
   nominationId    String
   nomination      Nomination   @relation(fields: [nominationId], references: [id])
   userId          String?
-  user            User?        @relation(fields: [userId], references: [id])
+  user            User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
   participantType String
   orgName         String
   inn             String
@@ -100,8 +104,14 @@ model Application {
   evaluations     Evaluation[]
   events          ApplicationEvent[]
   comments        ApplicationComment[]
+  recusals        JuryRecusal[]
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @default(now()) @updatedAt
+
+  @@index([userId])
+  @@index([email])
+  @@index([nominationId, status])
+  @@index([region])
 }
 
 // Комментарии к заявке (обсуждение участник ↔ оргкомитет/жюри)
@@ -124,6 +134,8 @@ model JuryRecusal {
   id            String   @id @default(cuid())
   juryUserId    String
   applicationId String
+  jury          User        @relation("JuryRecusalUser", fields: [juryUserId], references: [id], onDelete: Cascade)
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())
 
   @@unique([juryUserId, applicationId])
@@ -163,7 +175,7 @@ model LoginEvent {
 model Attachment {
   id            String      @id @default(cuid())
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   fieldName     String      @default("attachment") // ключ поля formSchema
   filename      String
   url           String
@@ -174,25 +186,28 @@ model Attachment {
 model Evaluation {
   id            String      @id @default(cuid())
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id])
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   juryUserId    String
-  jury          User        @relation(fields: [juryUserId], references: [id])
+  jury          User        @relation(fields: [juryUserId], references: [id], onDelete: Cascade)
   scores        Json // {criteriaKey: score}
   comment       String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @default(now()) @updatedAt
 
   @@unique([applicationId, juryUserId])
+  @@index([juryUserId])
 }
 
 model JuryAssignment {
   id           String     @id @default(cuid())
   juryUserId   String
-  jury         User       @relation(fields: [juryUserId], references: [id])
+  jury         User       @relation(fields: [juryUserId], references: [id], onDelete: Cascade)
   nominationId String
-  nomination   Nomination @relation(fields: [nominationId], references: [id])
+  nomination   Nomination @relation(fields: [nominationId], references: [id], onDelete: Cascade)
 
   @@unique([juryUserId, nominationId])
+  @@index([juryUserId])
+  @@index([nominationId])
 }
 
 // Токены для сброса/восстановления пароля по email.

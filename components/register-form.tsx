@@ -393,7 +393,7 @@ export function RegisterForm() {
             />
           </label>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+      <div className="form-two-columns" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={labelStyle}>Пол</span>
               <select
