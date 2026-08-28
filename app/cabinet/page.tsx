@@ -379,7 +379,6 @@ export default async function CabinetPage() {
                     comments={comments}
                     applicationId={a.id}
                     userRole="participant"
-                    userName={userName}
                   />
                 </div>
               </div>
