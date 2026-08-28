@@ -1,8 +1,9 @@
 /**
  * GET /admin/super/impersonate?token=xxx
- * Устанавливает httpOnly session cookie и редиректит в кабинет.
+ * Устанавливает httpOnly session cookie (формат NextAuth/Auth.js) и редиректит в кабинет.
  */
 import { NextResponse, type NextRequest } from "next/server";
+import { decode } from "next-auth/jwt";
 
 export const dynamic = "force-dynamic";
 
@@ -13,38 +14,41 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin/super", request.url));
   }
 
-  // Проверяем что токен валиден
-  try {
-    const secret = new TextEncoder().encode(
-      process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || ""
-    );
-    const { jwtVerify } = await import("jose");
-    const { payload } = await jwtVerify(token, secret);
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    return NextResponse.redirect(new URL("/admin/super?error=no_secret", request.url));
+  }
 
-    if (!payload.id || !payload.role) {
-      return NextResponse.redirect(new URL("/admin/super?error=bad_token", request.url));
-    }
+  // Cookie-имя должно совпадать с тем, что использовал encode() в impersonateUser
+  // (зависит от https — иначе salt для HKDF разъедется и decode всегда провалится).
+  const proto = request.headers.get("x-forwarded-proto");
+  const secureCookie = proto === "https" || request.nextUrl.protocol === "https:";
+  const cookieName = `${secureCookie ? "__Secure-" : ""}authjs.session-token`;
+
+  let payload: Record<string, unknown> | null;
+  try {
+    payload = await decode({ token, secret, salt: cookieName });
   } catch {
+    payload = null;
+  }
+
+  const role = payload?.role;
+  if (!payload?.id || !role) {
     return NextResponse.redirect(new URL("/admin/super?error=invalid_token", request.url));
   }
 
-  // Определяем target
   let target = "/cabinet";
-  try {
-    const { decodeJwt } = await import("jose");
-    const payload = decodeJwt(token);
-    if (payload.role === "jury") target = "/jury";
-    else if (payload.role === "admin" || payload.role === "superadmin") target = "/admin";
-  } catch {}
+  if (role === "jury") target = "/jury";
+  else if (role === "admin" || role === "superadmin") target = "/admin";
 
   const response = NextResponse.redirect(new URL(target, request.url));
 
-  response.cookies.set("authjs.session-token", token, {
+  response.cookies.set(cookieName, token, {
     httpOnly: true,
-    secure: false,
+    secure: secureCookie,
     sameSite: "lax",
     path: "/",
-    maxAge: 8 * 60 * 60,
+    maxAge: 60 * 60,
   });
 
   return response;

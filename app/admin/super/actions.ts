@@ -257,29 +257,40 @@ export async function testIntegrations(): Promise<{
 
 export async function impersonateUser(
   userId: string,
-): Promise<{ ok: boolean; error?: string; token?: string }> {
+): Promise<{ ok: boolean; error?: string; token?: string; cookieName?: string }> {
   await requireRole("superadmin");
   try {
-    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true } });
+    const user = await db.user.findUnique({ where: { id: userId }, select: { id: true, email: true, role: true, fio: true } });
     if (!user) return { ok: false, error: "Пользователь не найдён" };
 
     logAdminAction("impersonate", userId, { email: user.email, role: user.role });
 
-    const { SignJWT } = await import("jose");
-    const secret = new TextEncoder().encode(process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "");
-    // JWT должен содержать id и role — точно так же, как NextAuth jwt callback
-    const token = await new SignJWT({
-      id: user.id,
-      role: user.role,
-      email: user.email,
-      impersonated: true,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("1h")
-      .sign(secret);
+    const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+    if (!secret) return { ok: false, error: "AUTH_SECRET не настроен" };
 
-    return { ok: true, token };
+    // Токен должен быть в формате NextAuth (шифрованный JWE), иначе auth()
+    // молча не распознает cookie и сессия останется прежней (не подменится).
+    const { headers } = await import("next/headers");
+    const { encode } = await import("next-auth/jwt");
+    const proto = (await headers()).get("x-forwarded-proto");
+    const secureCookie = proto === "https";
+    const cookieName = `${secureCookie ? "__Secure-" : ""}authjs.session-token`;
+
+    const token = await encode({
+      secret,
+      salt: cookieName,
+      maxAge: 60 * 60,
+      token: {
+        sub: user.id,
+        id: user.id,
+        role: user.role,
+        email: user.email,
+        name: user.fio,
+        impersonated: true,
+      },
+    });
+
+    return { ok: true, token, cookieName };
   } catch (e) {
     recordError(e, "impersonateUser");
     return { ok: false, error: "Ошибка создания токена" };
