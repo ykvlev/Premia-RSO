@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hashSync } from "bcryptjs";
 import { encode } from "next-auth/jwt";
 import { db } from "@/lib/db";
+import { requestOrigin } from "@/lib/request-origin";
 
 const VK_APP_ID = process.env.VK_ID_APP_ID ?? "";
 const VK_APP_SECRET = process.env.VK_ID_APP_SECRET ?? "";
@@ -14,21 +15,23 @@ const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || ""
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  // Next 16 синтезирует request.url как localhost:PORT — для редиректов нужен публичный origin из заголовков прокси.
+  const origin = requestOrigin(request, url.toString());
   const code = url.searchParams.get("code");
   const error = url.searchParams.get("error");
 
   if (error) {
     console.error("[vk-callback] VK error:", error);
-    return NextResponse.redirect(new URL("/login?error=vk_denied", request.url));
+    return NextResponse.redirect(new URL("/login?error=vk_denied", origin));
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
+    return NextResponse.redirect(new URL("/login?error=missing_code", origin));
   }
 
   if (!VK_APP_ID || !VK_APP_SECRET || !AUTH_SECRET) {
     console.error("[vk-callback] VK not configured");
-    return NextResponse.redirect(new URL("/login?error=vk_not_configured", request.url));
+    return NextResponse.redirect(new URL("/login?error=vk_not_configured", origin));
   }
 
   try {
@@ -46,14 +49,14 @@ export async function GET(request: Request) {
     console.log("[vk-callback] Token exchange:", tokenRes.status, tokenText.slice(0, 300));
 
     if (!tokenRes.ok) {
-      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", request.url));
+      return NextResponse.redirect(new URL("/login?error=token_exchange_failed", origin));
     }
 
     const tokenData = JSON.parse(tokenText);
     const accessToken = tokenData.access_token;
 
     if (!accessToken) {
-      return NextResponse.redirect(new URL("/login?error=no_access_token", request.url));
+      return NextResponse.redirect(new URL("/login?error=no_access_token", origin));
     }
 
     // 2. Get user info
@@ -62,12 +65,12 @@ export async function GET(request: Request) {
     console.log("[vk-callback] User info:", userRes.status, userText.slice(0, 300));
 
     if (!userRes.ok) {
-      return NextResponse.redirect(new URL("/login?error=user_info_failed", request.url));
+      return NextResponse.redirect(new URL("/login?error=user_info_failed", origin));
     }
 
     const vkUser = JSON.parse(userText).user;
     if (!vkUser?.user_id) {
-      return NextResponse.redirect(new URL("/login?error=no_vk_user", request.url));
+      return NextResponse.redirect(new URL("/login?error=no_vk_user", origin));
     }
 
     const vkId = String(vkUser.user_id);
@@ -137,7 +140,7 @@ export async function GET(request: Request) {
           ? "/admin"
           : "/cabinet";
 
-    const response = NextResponse.redirect(new URL(target, request.url));
+    const response = NextResponse.redirect(new URL(target, origin));
 
     response.cookies.set(cookieName, sessionToken, {
       httpOnly: true,
@@ -150,6 +153,6 @@ export async function GET(request: Request) {
     return response;
   } catch (err) {
     console.error("[vk-callback] Server error:", err);
-    return NextResponse.redirect(new URL("/login?error=server_error", request.url));
+    return NextResponse.redirect(new URL("/login?error=server_error", origin));
   }
 }

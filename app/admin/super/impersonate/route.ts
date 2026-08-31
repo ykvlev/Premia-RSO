@@ -4,19 +4,22 @@
  */
 import { NextResponse, type NextRequest } from "next/server";
 import { decode } from "next-auth/jwt";
+import { requestOrigin } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  // Next 16 синтезирует request.url как localhost:PORT — редиректы строим от публичного origin.
+  const origin = requestOrigin(request);
   const token = request.nextUrl.searchParams.get("token");
 
   if (!token) {
-    return NextResponse.redirect(new URL("/admin/super", request.url));
+    return NextResponse.redirect(new URL("/admin/super", origin));
   }
 
   const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
   if (!secret) {
-    return NextResponse.redirect(new URL("/admin/super?error=no_secret", request.url));
+    return NextResponse.redirect(new URL("/admin/super?error=no_secret", origin));
   }
 
   // Cookie-имя должно совпадать с тем, что использовал encode() в impersonateUser
@@ -34,14 +37,14 @@ export async function GET(request: NextRequest) {
 
   const role = payload?.role;
   if (!payload?.id || !role) {
-    return NextResponse.redirect(new URL("/admin/super?error=invalid_token", request.url));
+    return NextResponse.redirect(new URL("/admin/super?error=invalid_token", origin));
   }
 
   let target = "/cabinet";
   if (role === "jury") target = "/jury";
   else if (role === "admin" || role === "superadmin") target = "/admin";
 
-  const response = NextResponse.redirect(new URL(target, request.url));
+  const response = NextResponse.redirect(new URL(target, origin));
 
   response.cookies.set(cookieName, token, {
     httpOnly: true,
