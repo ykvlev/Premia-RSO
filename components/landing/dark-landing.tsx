@@ -515,10 +515,18 @@ function Header({
   const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [lang, setLang] = useState<"RU" | "EN">("RU");
+  const [loggedIn, setLoggedIn] = useState(false);
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 40);
     window.addEventListener("scroll", fn);
     return () => window.removeEventListener("scroll", fn);
+  }, []);
+  useEffect(() => {
+    // Есть ли активная сессия — чтобы шапка показывала «Личный кабинет» вместо «Войти».
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((s) => setLoggedIn(!!s?.user))
+      .catch(() => {});
   }, []);
 
   const scroll = (ref: React.RefObject<HTMLElement | null>) =>
@@ -565,11 +573,11 @@ function Header({
           <button onClick={() => setLang((v) => (v === "RU" ? "EN" : "RU"))} style={{ background: "transparent", border: "1px solid #2a2a32", color: "#9a9aa4", fontSize: 12, fontFamily: "var(--font-onest), sans-serif", fontWeight: 700, borderRadius: 999, padding: "8px 12px", cursor: "pointer" }}>{lang}</button>
           <ThemeToggle />
           <button
-            onClick={() => router.push("/login")}
+            onClick={() => router.push(loggedIn ? "/cabinet" : "/login")}
             className="hdr-login cursor-pointer rounded-full border border-[#2a2a32] bg-transparent px-5 py-3 text-[15px] font-medium text-[#f2f0ec] transition-all duration-200 hover:border-[#4a4a56]"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
-            {lang === "RU" ? "Войти" : "Login"}
+            {loggedIn ? (lang === "RU" ? "Личный кабинет" : "My account") : lang === "RU" ? "Войти" : "Login"}
           </button>
           <button
             onClick={() => router.push("/apply")}

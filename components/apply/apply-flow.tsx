@@ -10,7 +10,6 @@ import { lookupInn } from "@/app/apply/lookup";
 import { motion, AnimatePresence } from "motion/react";
 import { NOMINATIONS } from "@/components/landing/dark-landing";
 import { Confetti } from "@/components/apply/confetti";
-import { ShareBrickCard } from "@/components/apply/share-brick-card";
 import { REGIONS } from "@/lib/regions";
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
@@ -18,7 +17,7 @@ import { REGIONS } from "@/lib/regions";
 const ORG_TYPES = [
   "Физическое лицо",
   "Вуз",
-  "Ссуз",
+  "Ссуз / школа",
   "Региональное отделение",
   "Работодатель",
   "СМИ",
@@ -31,7 +30,7 @@ const ELIGIBILITY: Record<string, OrgType[]> = {
   "01": ["Работодатель"],
   "02": ["Работодатель"],
   "03": ["Вуз"],
-  "04": ["Ссуз"],
+  "04": ["Ссуз / школа"],
   "05": ["Работодатель"],
   // 1.2 Региональные отделения и участники движения
   "06": ["Региональное отделение"],
@@ -85,7 +84,7 @@ const NOMINATE_OPTIONS: Record<string, string[]> = {
   "Физическое лицо": ["Себя", "Другого человека"],
   СМИ: ["Организацию / редакцию"],
   Вуз: ["Организацию (вуз)"],
-  Ссуз: ["Организацию (ссуз / колледж)"],
+  "Ссуз / школа": ["Организацию (ссуз, колледж или школу)"],
   "Региональное отделение": ["Региональное отделение"],
   Работодатель: ["Организацию-работодателя"],
   "Орган власти": ["Орган исполнительной власти"],
@@ -1656,17 +1655,6 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
           >
             Заявка отправлена
           </p>
-          <p
-            style={{
-              color: "#9a9aa4",
-              fontSize: 16,
-              fontFamily: F,
-              lineHeight: 1.7,
-              maxWidth: 460,
-            }}
-          >
-            Оргкомитет рассмотрит вашу заявку и свяжется в течение 3 рабочих дней.
-          </p>
           {selectedNom && (
             <div
               style={{
@@ -1697,24 +1685,6 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
               </p>
             </div>
           )}
-
-          <div style={{ width: "100%", maxWidth: 460 }}>
-            <p
-              style={{
-                color: "#c8c8d0",
-                fontSize: 15,
-                fontFamily: F,
-                fontWeight: 600,
-                marginBottom: 14,
-              }}
-            >
-              Расскажи, что участвуешь — сохрани картинку и выложи в сторис 👇
-            </p>
-            <ShareBrickCard
-              headline="Я подал заявку"
-              nomination={selectedNom?.title}
-            />
-          </div>
 
           <button
             onClick={() => router.push("/")}
