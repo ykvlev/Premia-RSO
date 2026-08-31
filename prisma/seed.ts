@@ -343,24 +343,22 @@ const FIELDS: Record<string, Field[]> = {
     { name: "gratitudeLetters", label: "Благодарственные письма / письма о качестве деятельности — сканы, объединённые в один PDF", type: "file" },
     { name: "additionalDocs", label: "Дополнительные подтверждающие документы — сканы, объединённые в один PDF (при наличии)", type: "file" },
   ],
-  // Профессиональное / общеобразование — Приложение №1 + справки (сканы PDF)
+  // Профессиональное / общеобразование — Положение §7: заявка на бланке + подтверждающие документы
   "Лучшая практика организации деятельности студотрядов в профессиональной и общеобразовательной организации": [
-    { name: "orgName", label: "Полное наименование образовательной организации", type: "text", required: true },
-    { name: "orgShortName", label: "Сокращённое наименование", type: "text" },
-    { name: "orgAddress", label: "Место нахождения", type: "text", required: true },
-    { name: "orgEmail", label: "Электронный адрес", type: "text", required: true },
-    { name: "orgPhone", label: "Контактный телефон", type: "text", required: true },
-    { name: "orgFounder", label: "Полное наименование учредителя", type: "text", required: true },
-    { name: "headFio", label: "Ф.И.О. руководителя или уполномоченного лица", type: "text", required: true },
-    { name: "headPosition", label: "Должность руководителя / уполномоченного лица", type: "text", required: true },
-    { name: "authorizedFio", label: "Ф.И.О. уполномоченного лица (если не руководитель)", type: "text" },
-    { name: "authorizedPosition", label: "Должность уполномоченного лица", type: "text" },
-    { name: "applicationScan", label: "Заявка на участие (Приложение №1) — скан в формате PDF", type: "file", required: true },
-    { name: "infoSheet1Scan", label: "Информационная справка №1 (Приложение №3 для ОО / №2 для ПОО) — скан в формате PDF", type: "file", required: true },
-    { name: "infrastructurePassport", label: "Паспорт инфраструктурного объекта (Приложение №4) — скан в формате PDF (при наличии)", type: "file" },
-    { name: "competitionResults", label: "Результаты участия в конкурсах — сканы грамот/дипломов/сертификатов, объединённые в один PDF", type: "file" },
-    { name: "gratitudeLetters", label: "Благодарственные письма / письма о качестве деятельности — сканы, объединённые в один PDF", type: "file" },
-    { name: "additionalDocs", label: "Дополнительные подтверждающие документы — сканы, объединённые в один PDF (при наличии)", type: "file" },
+    { name: "orgName", label: "Наименование образовательной организации", type: "text", required: true },
+    {
+      name: "applicationScan",
+      label: "Заявка на бланке организации (Приложение №1) — подписана руководителем и заверена печатью ОО, скан в формате PDF",
+      type: "file",
+      required: true,
+    },
+    {
+      name: "supportingDocs",
+      label:
+        "Подтверждающие документы: информационные справки №1–2 (Приложения №2–3), паспорт инфраструктурного объекта (Приложение №4, при наличии), сканы грамот/дипломов и благодарственных писем — объединить в один файл PDF",
+      type: "file",
+      required: true,
+    },
   ],
   // Приложение №3
   "Мастер слова «Событие года»": [
