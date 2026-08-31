@@ -221,6 +221,7 @@ type Field = {
   type: "text" | "textarea" | "number" | "select" | "url" | "file";
   required?: boolean;
   options?: string[];
+  templates?: { label: string; url: string }[];
 };
 
 const ORG_HEAD: Field[] = [
@@ -351,15 +352,20 @@ const FIELDS: Record<string, Field[]> = {
     { name: "orgName", label: "Наименование образовательной организации", type: "text", required: true },
     {
       name: "applicationScan",
-      label: "Форма заявки на бланке образовательной организации",
+      label: "Форма заявки на бланке образовательной организации, согласно форме заявки в Положении",
       type: "file",
       required: true,
+      templates: [{ label: "бланк заявки (Приложение №1)", url: "/docs/forma-zayavki-priloshenie-1.docx" }],
     },
     {
       name: "supportingDocs",
-      label: "Подтверждающие документы",
+      label: "Подтверждающие документы, согласно перечню документов в Приложении 2-3 к Положению",
       type: "file",
       required: true,
+      templates: [
+        { label: "Положение о конкурсе", url: "/docs/polozhenie-poo-oo-2026.pdf" },
+        { label: "перечень документов (Приложение)", url: "/docs/prilozhenie-k-polozheniyu-oo.docx" },
+      ],
     },
   ],
   // Приложение №3

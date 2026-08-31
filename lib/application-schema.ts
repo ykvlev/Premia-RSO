@@ -13,6 +13,8 @@ export type FormField = {
   type: "text" | "textarea" | "number" | "select" | "url" | "file";
   required?: boolean;
   options?: string[];
+  /** Скачиваемые шаблоны (для file-полей) — например, бланк заявки или перечень документов. */
+  templates?: { label: string; url: string }[];
 };
 
 /** Общие поля заявки (SPEC §7 п.2). */

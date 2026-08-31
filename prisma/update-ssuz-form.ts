@@ -11,21 +11,26 @@ import { PrismaClient } from "../lib/generated/prisma/client";
  */
 
 const TITLE =
-  "Лучшая практика организации деятельности студотрядов в профессиональной и общеобразовательной организации";
+  "«Лучшая практика организации деятельности студотрядов в профессиональной и общеобразовательной организации»";
 
 const formSchema = [
   { name: "orgName", label: "Наименование образовательной организации", type: "text", required: true },
   {
     name: "applicationScan",
-    label: "Форма заявки на бланке образовательной организации",
+    label: "Форма заявки на бланке образовательной организации, согласно форме заявки в Положении",
     type: "file",
     required: true,
+    templates: [{ label: "бланк заявки (Приложение №1)", url: "/docs/forma-zayavki-priloshenie-1.docx" }],
   },
   {
     name: "supportingDocs",
-    label: "Подтверждающие документы",
+    label: "Подтверждающие документы, согласно перечню документов в Приложении 2-3 к Положению",
     type: "file",
     required: true,
+    templates: [
+      { label: "Положение о конкурсе", url: "/docs/polozhenie-poo-oo-2026.pdf" },
+      { label: "перечень документов (Приложение)", url: "/docs/prilozhenie-k-polozheniyu-oo.docx" },
+    ],
   },
 ];
 

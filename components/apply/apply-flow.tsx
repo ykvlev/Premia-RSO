@@ -29,7 +29,6 @@ const ELIGIBILITY: Record<string, OrgType[]> = {
   // 1.1 Организации / работодатели
   "01": ["Работодатель"],
   "02": ["Работодатель"],
-  "03": ["Вуз"],
   "04": ["Ссуз / школа"],
   "05": ["Работодатель"],
   // 1.2 Региональные отделения и участники движения
@@ -84,7 +83,7 @@ const NOMINATE_OPTIONS: Record<string, string[]> = {
   "Физическое лицо": ["Себя", "Другого человека"],
   СМИ: ["Организацию / редакцию"],
   Вуз: ["Организацию (вуз)"],
-  "Ссуз / школа": ["Организацию (ссуз, колледж или школу)"],
+  "Ссуз / школа": ["Общеобразовательную организацию", "Профессиональную образовательную организацию"],
   "Региональное отделение": ["Региональное отделение"],
   Работодатель: ["Организацию-работодателя"],
   "Орган власти": ["Орган исполнительной власти"],
@@ -737,6 +736,8 @@ export type NomField = {
   type: "text" | "textarea" | "number" | "select" | "url" | "file";
   required?: boolean;
   options?: string[];
+  /** Скачиваемые шаблоны (для file-полей) — например, бланк заявки или перечень документов. */
+  templates?: { label: string; url: string }[];
 };
 
 const NOM_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png";
@@ -768,6 +769,30 @@ function DynamicNominationFields({
             <label style={LABEL}>
               {f.label} {f.required && <Req />}
             </label>
+            {f.type === "file" && f.templates && f.templates.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 8 }}>
+                {f.templates.map((t) => (
+                  <a
+                    key={t.url}
+                    href={t.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: accent,
+                      fontSize: 12,
+                      fontFamily: F,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.4px",
+                      textDecoration: "none",
+                      borderBottom: `1px solid ${accent}55`,
+                    }}
+                  >
+                    Скачать: {t.label} →
+                  </a>
+                ))}
+              </div>
+            )}
             {f.type === "textarea" ? (
               <LargeTextarea
                 value={values[f.name] ?? ""}

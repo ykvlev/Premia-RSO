@@ -59,7 +59,7 @@ export function ApplicationComments({
       const res = await fetch("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ applicationId, body: text.trim() }),
+        body: JSON.stringify({ applicationId, text: text.trim() }),
       });
       const data = await res.json();
       if (data.ok && data.comment) {
