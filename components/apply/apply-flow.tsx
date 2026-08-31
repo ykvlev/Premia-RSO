@@ -1698,6 +1698,18 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
           >
             На главную
           </button>
+          <p
+            style={{
+              color: "#6a6a72",
+              fontSize: 12,
+              fontFamily: F,
+              maxWidth: 420,
+              lineHeight: 1.5,
+            }}
+          >
+            Данные для входа в личный кабинет в случае отсутствия регистрации направлены на
+            указанную почту.
+          </p>
         </motion.div>
       ) : (
         <AnimatePresence mode="wait">
