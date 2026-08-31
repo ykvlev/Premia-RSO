@@ -2308,10 +2308,18 @@ function FaqSection() {
 
 function ContactsSection() {
   const { ref, visible } = useScrollVisible();
-  const docs = [
-    "Положение о Национальной премии 2026",
-    "Положение о конкурсе Лучшая практика организации деятельности студенческих отрядов в образовательной организации высшего образования",
-    "Положение Лучшая практика организации деятельности студенческих отрядов в профессиональной образовательной организации и общеобразовательной организации",
+  const docs: { title: string; href?: string }[] = [
+    { title: "Положение о Национальной премии 2026", href: "/docs/polozhenie-o-premii-2026.pdf" },
+    {
+      title:
+        "Положение о конкурсе Лучшая практика организации деятельности студенческих отрядов в образовательной организации высшего образования",
+      href: "/docs/polozhenie-oovo-2026.pdf",
+    },
+    {
+      title:
+        "Положение Лучшая практика организации деятельности студенческих отрядов в профессиональной образовательной организации и общеобразовательной организации",
+      href: "/docs/polozhenie-poo-oo-2026.pdf",
+    },
   ];
   return (
     <section
@@ -2367,6 +2375,7 @@ function ContactsSection() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    gap: 16,
                     padding: "16px 0",
                     borderBottom: "1px solid #2a2a32",
                   }}
@@ -2379,20 +2388,43 @@ function ContactsSection() {
                       fontWeight: 500,
                     }}
                   >
-                    {d}
+                    {d.title}
                   </p>
-                  <p
-                    style={{
-                      color: "#9a9aa4",
-                      fontSize: 11,
-                      fontFamily: "var(--font-onest), sans-serif",
-                      fontWeight: 500,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.72px",
-                    }}
-                  >
-                    PDF · скоро
-                  </p>
+                  {d.href ? (
+                    <a
+                      href={d.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: "#0804ff",
+                        fontSize: 11,
+                        fontFamily: "var(--font-onest), sans-serif",
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.72px",
+                        textDecoration: "none",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                    >
+                      Смотреть / скачать →
+                    </a>
+                  ) : (
+                    <p
+                      style={{
+                        color: "#9a9aa4",
+                        fontSize: 11,
+                        fontFamily: "var(--font-onest), sans-serif",
+                        fontWeight: 500,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.72px",
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                      }}
+                    >
+                      PDF · скоро
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
