@@ -34,7 +34,9 @@ export default async function CabinetPage() {
   if (!session?.user?.id) redirect("/login");
   const email = session.user.email ?? "";
   const userId = session.user.id;
-  const userName = session.user.name || "Участник";
+  const fullName = session.user.name || "Участник";
+  // ФИО хранится как "Фамилия Имя Отчество" — в приветствии оставляем только имя.
+  const userName = fullName.trim().split(/\s+/)[1] || fullName;
 
   const [apps, season, user, allEvents]: [any[], { endAt: Date } | null, any, any[]] = await safeDb(
     async () => {
@@ -190,7 +192,7 @@ export default async function CabinetPage() {
               textDecoration: "none",
             }}
           >
-            Подать первую заявку
+            Подать заявку
           </a>
         </div>
       ) : (
