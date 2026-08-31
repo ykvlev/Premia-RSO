@@ -7,10 +7,12 @@ export const metadata: Metadata = { title: "Вход" };
 
 const F = "var(--font-onest), sans-serif";
 
-/** Вход для жюри и организаторов. Уже вошёл — уводим по роли. */
+/** Вход для жюри и организаторов. Уже вошёл (валидная сессия) — уводим по роли. */
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user) {
+  // Проверяем именно id: сессия без id (битый/старый токен) считается невалидной,
+  // иначе /login кидает в /cabinet, а /cabinet кидает обратно — вечная петля.
+  if (session?.user?.id) {
     const target =
       session.user.role === "jury"
         ? "/jury"

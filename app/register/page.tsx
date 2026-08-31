@@ -7,10 +7,11 @@ export const metadata: Metadata = { title: "Регистрация" };
 
 const F = "var(--font-onest), sans-serif";
 
-/** Регистрация нового участника. Уже вошёл — редирект. */
+/** Регистрация нового участника. Уже вошёл (валидная сессия) — редирект. */
 export default async function RegisterPage() {
   const session = await auth();
-  if (session?.user) {
+  // Только сессия с id — иначе петля /register ↔ /cabinet (см. /login).
+  if (session?.user?.id) {
     const target =
       session.user.role === "jury"
         ? "/jury"

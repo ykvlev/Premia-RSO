@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { hashSync } from "bcryptjs";
-import { SignJWT } from "jose";
+import { encode } from "next-auth/jwt";
 import { db } from "@/lib/db";
 
 const VK_APP_ID = process.env.VK_ID_APP_ID ?? "";
 const VK_APP_SECRET = process.env.VK_ID_APP_SECRET ?? "";
 const VK_REDIRECT_URI = process.env.VK_REDIRECT_URI ?? "";
-const AUTH_SECRET = process.env.AUTH_SECRET || "";
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "";
 
 /**
  * VK ID OAuth callback — GET handler.
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
   }
 
-  if (!VK_APP_ID || !VK_APP_SECRET) {
+  if (!VK_APP_ID || !VK_APP_SECRET || !AUTH_SECRET) {
     console.error("[vk-callback] VK not configured");
     return NextResponse.redirect(new URL("/login?error=vk_not_configured", request.url));
   }
@@ -105,18 +105,30 @@ export async function GET(request: Request) {
       console.log("[vk-callback] Found user:", user.id);
     }
 
-    // 4. Create JWT session token
-    const secret = new TextEncoder().encode(AUTH_SECRET);
-    const sessionToken = await new SignJWT({
-      sub: user.id,
-      email: user.email,
-      name: user.fio,
-      role: user.role,
-    })
-      .setProtectedHeader({ alg: "HS256" })
-      .setIssuedAt()
-      .setExpirationTime("8h")
-      .sign(secret);
+    // 4. Создаём сессию В ФОРМАТЕ NextAuth v5.
+    //    Токен обязан быть закодирован через encode() с salt = имя cookie (HKDF):
+    //    самодельный SignJWT NextAuth молча не распознаёт (см. фикс имперсонации),
+    //    и пользователя бесконечно кидает /cabinet ↔ /login.
+    //    В payload обязательно id — session callback берёт session.user.id = token.id,
+    //    без него /cabinet и /profile кидают на /login.
+    //    Имя cookie с __Secure- префиксом на https — иначе NextAuth его не прочитает.
+    const secureCookie =
+      request.headers.get("x-forwarded-proto") === "https" ||
+      url.protocol === "https:";
+    const cookieName = `${secureCookie ? "__Secure-" : ""}authjs.session-token`;
+
+    const sessionToken = await encode({
+      secret: AUTH_SECRET,
+      salt: cookieName,
+      maxAge: 8 * 60 * 60,
+      token: {
+        sub: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.fio,
+        role: user.role,
+      },
+    });
 
     const target =
       user.role === "jury"
@@ -127,17 +139,9 @@ export async function GET(request: Request) {
 
     const response = NextResponse.redirect(new URL(target, request.url));
 
-    response.cookies.set("authjs.session-token", sessionToken, {
+    response.cookies.set(cookieName, sessionToken, {
       httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 8 * 60 * 60,
-    });
-    // Dev fallback (non-secure cookie for localhost)
-    response.cookies.set("authjs.session-token", sessionToken, {
-      httpOnly: true,
-      secure: false,
+      secure: secureCookie,
       sameSite: "lax",
       path: "/",
       maxAge: 8 * 60 * 60,

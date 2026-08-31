@@ -9,7 +9,8 @@ const F = "var(--font-onest), sans-serif";
 
 export default async function ForgotPasswordPage() {
   const session = await auth();
-  if (session?.user) {
+  // Только сессия с id — иначе петля /forgot-password ↔ /cabinet (см. /login).
+  if (session?.user?.id) {
     const target =
       session.user.role === "jury"
         ? "/jury"

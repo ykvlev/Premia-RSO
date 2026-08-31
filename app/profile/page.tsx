@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import { db, safeDb } from "@/lib/db";
 import { ProfileForm } from "@/components/profile-form";
 
 export const metadata: Metadata = { title: "Профиль участника" };
@@ -12,31 +12,36 @@ export default async function ProfilePage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
-  let user = null;
-  try {
-    user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: {
-        id: true,
-        fio: true,
-        email: true,
-        phone: true,
-        gender: true,
-        birthDate: true,
-        city: true,
-        region: true,
-        telegram: true,
-        vkUrl: true,
-        avatarUrl: true,
-        emailVerified: true,
-        twoFactorEnabled: true,
-      },
-    });
-  } catch {
-    // dev without DB
-  }
+  // safeDb: в проде ошибка БД пробрасывается (error boundary), в dev — fallback.
+  // Молча глотать ошибку нельзя: она выглядит как «юзера нет» и кидает
+  // залогиненного человека на /login (а оттуда обратно — петля).
+  const user = await safeDb(
+    () =>
+      db.user.findUnique({
+        where: { id: session.user.id },
+        select: {
+          id: true,
+          fio: true,
+          email: true,
+          phone: true,
+          gender: true,
+          birthDate: true,
+          city: true,
+          region: true,
+          telegram: true,
+          vkUrl: true,
+          avatarUrl: true,
+          emailVerified: true,
+          twoFactorEnabled: true,
+        },
+      }),
+    null,
+  );
 
-  if (!user) redirect("/login");
+  // Юзера нет в БД (аккаунт удалён) — ведём в кабинет, а не на /login:
+  // сессия валидна, /login с ней тут же кинет обратно (пинг-понг для зомби-сессии).
+  // В кабинете юзер видит баннер про незаполненный профиль и кнопку «Выход».
+  if (!user) redirect("/cabinet");
 
   return (
     <main

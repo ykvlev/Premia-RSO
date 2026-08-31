@@ -269,6 +269,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id as string;
         token.role = user.role;
       }
+      // Токены без id (старые сессии до появления claim, ручные jwt) —
+      // восстанавливаем id из sub, иначе session.user.id пустой и
+      // /cabinet с /profile бесконечно кидают на /login.
+      if (!token.id && token.sub) token.id = token.sub;
       // VK OAuth: ищем/создаём пользователя
       if (account?.provider === "vkid" && user) {
         token.role = user.role ?? "participant";

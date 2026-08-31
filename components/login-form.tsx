@@ -37,7 +37,9 @@ export function LoginForm() {
     }
 
     const session = await getSession();
-    const target = roleHome[session?.user?.role ?? "participant"] ?? "/";
+    // Fallback /cabinet, а не "/": юзер с неизвестной ролью не должен
+    // вылетать на лендинг после успешного входа.
+    const target = roleHome[session?.user?.role ?? "participant"] ?? "/cabinet";
     router.push(target);
     router.refresh();
   }
