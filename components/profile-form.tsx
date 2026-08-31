@@ -266,9 +266,9 @@ export function ProfileForm({ user }: { user: User }) {
         />
       </label>
 
-      {/* ── Telegram (необязательно) ── */}
+      {/* ── MAX (необязательно) ── */}
       <label style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <span style={labelStyle}>Telegram</span>
+        <span style={labelStyle}>MAX</span>
         <input
           type="text"
           value={telegram}
