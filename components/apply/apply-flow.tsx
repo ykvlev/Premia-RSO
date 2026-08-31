@@ -710,7 +710,6 @@ type FormState = {
   nominateSelf: string;
   consentPersonal: boolean;
   consentTerms: boolean;
-  consentNewsletter: boolean;
   howKnew: string;
   // Page 2 — nominee
   nomLastName: string;
@@ -827,7 +826,6 @@ const INITIAL: FormState = {
   nominateSelf: "",
   consentPersonal: false,
   consentTerms: false,
-  consentNewsletter: false,
   howKnew: "",
   nomLastName: "",
   nomFirstName: "",
@@ -1043,13 +1041,11 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
           nomPhoto: _p,
           consentPersonal: _c1,
           consentTerms: _c2,
-          consentNewsletter: _c3,
           ...rest
         } = form;
         void _p;
         void _c1;
         void _c2;
-        void _c3;
         localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...rest, _page: page }));
         setDraftSaved(true);
       } catch {
@@ -1300,7 +1296,6 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
     fd.set("nominateSelf", form.nominateSelf);
     fd.set("howKnew", form.howKnew);
     fd.set("links", form.links.join("\n"));
-    fd.set("consentNewsletter", String(form.consentNewsletter));
     fd.set("consentPersonal", String(form.consentPersonal));
     fd.set("consentTerms", String(form.consentTerms));
     fd.set("smart-token", captchaToken);
@@ -2056,13 +2051,6 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                         . <span style={{ color: "#ff6b6b" }}>*</span>
                       </Checkbox>
                     </div>
-                    <Checkbox
-                      checked={form.consentNewsletter}
-                      onChange={(v) => set("consentNewsletter", v)}
-                    >
-                      Я согласен на получение рассылки рекламного, информационного
-                      характера от организаторов Национальной премии «Труд крут».
-                    </Checkbox>
                   </div>
 
                   <div style={{ display: "flex", gap: 12, paddingTop: 8 }}>
