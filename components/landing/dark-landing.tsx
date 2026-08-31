@@ -572,11 +572,11 @@ function Header({
             {lang === "RU" ? "Войти" : "Login"}
           </button>
           <button
-            onClick={() => router.push("/register")}
+            onClick={() => router.push("/apply")}
             className="cursor-pointer rounded-full border-0 bg-[#0804ff] px-6 py-3 text-[15px] font-medium text-white transition-all duration-200 hover:scale-105 hover:bg-[#0a06ff] active:scale-95"
             style={{ fontFamily: "var(--font-onest), sans-serif" }}
           >
-            {lang === "RU" ? "Регистрация" : "Sign up"}
+            {lang === "RU" ? "Подать заявку" : "Apply"}
           </button>
         </div>
       </div>
@@ -768,7 +768,7 @@ function Hero({
             style={{ display: "flex", gap: 12, marginTop: 36 }}
           >
             <button
-              onClick={() => router.push("/register")}
+              onClick={() => router.push("/apply")}
               style={{
                 background: "#0804ff",
                 color: "white",
@@ -784,7 +784,7 @@ function Hero({
               onMouseEnter={(e) => (e.currentTarget.style.background = "#0603cc")}
               onMouseLeave={(e) => (e.currentTarget.style.background = "#0804ff")}
             >
-              Регистрация
+              Подать заявку
             </button>
             <button
               onClick={() =>

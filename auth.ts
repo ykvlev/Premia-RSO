@@ -20,12 +20,6 @@ const credentialsSchema = z.object({
   twoFactorCode: z.string().optional(),
 });
 
-const vkSignInSchema = z.object({
-  vkId: z.string().min(1),
-  email: z.string().optional(),
-  name: z.string().optional(),
-});
-
 // Антибрутфорс входа (in-memory, на инстанс; сбрасывается при рестарте).
 const LOGIN_MAX_PER_IP = 5; // попыток с одного IP
 const LOGIN_MAX_PER_EMAIL = 5; // попыток на один email
@@ -209,62 +203,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return { id: user.id, email: user.email, name: user.fio, role: user.role };
       },
     }),
-    Credentials({
-      id: "vk",
-      name: "VK",
-      credentials: {
-        vkId: { label: "VK ID", type: "text" },
-        email: { label: "Email", type: "email" },
-        name: { label: "Name", type: "text" },
-      },
-      async authorize(credentials) {
-        const parsed = vkSignInSchema.safeParse(credentials);
-        if (!parsed.success) return null;
-
-        const { vkId, email, name } = parsed.data;
-
-        if (process.env.NODE_ENV !== "production" && !(await isDbAvailable())) {
-          return { id: `dev-vk-${vkId}`, email: email || `vk_${vkId}@placeholder.local`, name, role: "participant" };
-        }
-
-        // Ищем по vkUrl
-        let user = await db.user.findFirst({ where: { vkUrl: `vk:${vkId}` } });
-
-        // Или по email
-        if (!user && email) {
-          user = await db.user.findUnique({ where: { email } });
-        }
-
-        if (!user) {
-          const { hashSync } = await import("bcryptjs");
-          user = await db.user.create({
-            data: {
-              fio: name || `VK User ${vkId}`,
-              email: email || `vk_${vkId}@placeholder.local`,
-              passwordHash: hashSync(`vk_${Date.now()}`, 10),
-              vkUrl: `vk:${vkId}`,
-              emailVerified: email ? new Date() : null,
-              role: "participant",
-            },
-          });
-        } else {
-          await db.user.update({
-            where: { id: user.id },
-            data: {
-              vkUrl: user.vkUrl?.startsWith("vk:") ? user.vkUrl : `vk:${vkId}`,
-              emailVerified: user.emailVerified || (email ? new Date() : null),
-              fio: user.fio || name || `VK User ${vkId}`,
-            },
-          });
-        }
-
-        await logLogin({ email: user.email, success: true, userId: user.id, role: user.role, fio: user.fio });
-        return { id: user.id, email: user.email, name: user.fio, role: user.role };
-      },
-    }),
   ],
   callbacks: {
-    jwt({ token, user, account }) {
+    jwt({ token, user }) {
       if (user) {
         token.id = user.id as string;
         token.role = user.role;
@@ -273,10 +214,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       // восстанавливаем id из sub, иначе session.user.id пустой и
       // /cabinet с /profile бесконечно кидают на /login.
       if (!token.id && token.sub) token.id = token.sub;
-      // VK OAuth: ищем/создаём пользователя
-      if (account?.provider === "vkid" && user) {
-        token.role = user.role ?? "participant";
-      }
       return token;
     },
     session({ session, token }) {

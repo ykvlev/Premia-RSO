@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { db, safeDb } from "@/lib/db";
 import { ApplyFlow, type NomField } from "@/components/apply/apply-flow";
-import { requireCompleteProfile } from "@/lib/auth-helpers";
 
 export const metadata: Metadata = {
   title: "Подать заявку",
@@ -16,12 +15,10 @@ export const dynamic = "force-dynamic";
  * динамически из formSchema выбранной номинации (официальные поля приложений
  * к положению премии). Отправка → submitNomineeApplication.
  *
- * Требуется заполненный профиль (ФИО, телефон, регион, город, пол, дата рождения).
+ * Открыта без входа — личный кабинет создаётся автоматически при подаче
+ * (submitNomineeApplication заводит User по email заявителя).
  */
 export default async function ApplyPage() {
-  // Блокируем подачу заявки если профиль не заполнен
-  await requireCompleteProfile();
-
   const schemas = await safeDb(async () => {
     const season = await db.season.findFirst({ where: { isActive: true } });
     const noms = season

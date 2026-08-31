@@ -7,7 +7,6 @@ const labels: Record<string, string> = {
   profile: "Профиль",
   apply: "Подать заявку",
   login: "Вход",
-  register: "Регистрация",
   admin: "Админ",
   jury: "Жюри",
   nominations: "Номинации",

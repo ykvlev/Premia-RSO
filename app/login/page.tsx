@@ -97,7 +97,7 @@ export default async function LoginPage() {
             marginBottom: 10,
           }}
         >
-          Вход / Регистрация
+          Вход
         </h1>
         <p
           style={{
@@ -108,56 +108,8 @@ export default async function LoginPage() {
             marginBottom: 28,
           }}
         >
-          Войдите или создайте аккаунт для подачи заявок на премию «Труд крут».
+          Войдите в личный кабинет по email и паролю, которые пришли на почту после подачи заявки.
         </p>
-
-        {/* Табы Вход / Регистрация */}
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            background: "#121216",
-            border: "1px solid #2a2a32",
-            borderRadius: 12,
-            padding: 4,
-            marginBottom: 20,
-          }}
-        >
-          <a
-            href="/login"
-            style={{
-              flex: 1,
-              textAlign: "center",
-              padding: "10px 0",
-              borderRadius: 8,
-              background: "#0804ff",
-              color: "#fff",
-              fontSize: 14,
-              fontFamily: F,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Вход
-          </a>
-          <a
-            href="/register"
-            style={{
-              flex: 1,
-              textAlign: "center",
-              padding: "10px 0",
-              borderRadius: 8,
-              background: "transparent",
-              color: "#9a9aa4",
-              fontSize: 14,
-              fontFamily: F,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
-            Регистрация
-          </a>
-        </div>
 
         {/* карточка с формой */}
         <div
@@ -181,9 +133,10 @@ export default async function LoginPage() {
           }}
         >
           Нет аккаунта?{" "}
-          <a href="/register" style={{ color: "#0804ff", textDecoration: "none" }}>
-            Зарегистрироваться
-          </a>
+          <a href="/apply" style={{ color: "#0804ff", textDecoration: "none" }}>
+            Подайте заявку
+          </a>{" "}
+          — кабинет создастся автоматически.
         </p>
 
         <p

@@ -40,7 +40,6 @@ const STATIC_ITEMS: CmdItem[] = [
   { id: "status", label: "Проверить статус", icon: "🔍", section: "Навигация", href: "/status", keywords: "статус заявка проверка" },
   { id: "winners", label: "Победители", icon: "🏆", section: "Навигация", href: "/pobediteli", keywords: "победители лауреаты" },
   { id: "login", label: "Войти", icon: "🔑", section: "Навигация", href: "/login", keywords: "вход логин авторизация" },
-  { id: "register", label: "Регистрация", icon: "📝", section: "Навигация", href: "/register", keywords: "регистрация создать аккаунт" },
 ];
 
 const ADMIN_ITEMS: CmdItem[] = [

@@ -9,11 +9,16 @@ import type { Role } from "@/lib/generated/prisma/client";
  * requireRole(), requireAuth() или requireCompleteProfile() в самом начале.
  */
 
-/** Проверяет роль. Нет сессии → /login; роль не подходит → на главную. */
+/** Проверяет роль. Нет сессии → /login; роль не подходит → на главную.
+ *  Вызов БЕЗ ролей = «любой авторизованный» (участник тоже).
+ *  Раньше пустой roles всегда проваливал includes() и redirect("/") кидал
+ *  ЛЮБОГО пользователя на лендинг — из-за этого кабинет выбрасывал через
+ *  пару секунд после загрузки, когда колокольчик уведомлений дёргал
+ *  getUnreadCount() → requireRole(). */
 export async function requireRole(...roles: Role[]) {
   const session = await auth();
-  if (!session?.user) redirect("/login");
-  if (!roles.includes(session.user.role as Role)) redirect("/");
+  if (!session?.user?.id) redirect("/login");
+  if (roles.length > 0 && !roles.includes(session.user.role as Role)) redirect("/");
   return session;
 }
 
