@@ -8,8 +8,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/", priority: 1, freq: "weekly" },
     { path: "/apply", priority: 0.9, freq: "monthly" },
     { path: "/pobediteli", priority: 0.7, freq: "monthly" },
+    { path: "/status", priority: 0.6, freq: "monthly" },
     { path: "/vhod", priority: 0.5, freq: "yearly" },
+    { path: "/otkrytka", priority: 0.5, freq: "monthly" },
     { path: "/privacy", priority: 0.3, freq: "yearly" },
+    { path: "/cookie", priority: 0.3, freq: "yearly" },
+    { path: "/consent", priority: 0.3, freq: "yearly" },
   ];
   return routes.map((r) => ({
     url: `${SITE_URL}${r.path === "/" ? "" : r.path}`,
