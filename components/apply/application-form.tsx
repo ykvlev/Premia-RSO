@@ -10,6 +10,7 @@ import {
   type FormField,
 } from "@/lib/application-schema";
 import { uploadConfig } from "@/lib/upload-config";
+import { REGIONS } from "@/lib/regions";
 import { submitApplication } from "@/app/apply/actions";
 import Link from "next/link";
 
@@ -227,7 +228,16 @@ export function ApplicationForm({ nominations }: { nominations: NominationOption
           </label>
           <label className="flex flex-col gap-1.5">
             <Label required>Регион</Label>
-            <input name="region" className={inputCls} />
+            <select name="region" defaultValue="" className={inputCls}>
+              <option value="" disabled>
+                Выберите регион
+              </option>
+              {REGIONS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </select>
             <FieldError message={errors.region} />
           </label>
           <label className="flex flex-col gap-1.5">

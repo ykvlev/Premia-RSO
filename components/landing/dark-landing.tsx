@@ -234,6 +234,15 @@ function GlobalStyles() {
         .footer-cols { flex-direction:column !important; gap:28px !important; }
         .footer-pad { padding:40px 22px !important; }
         .nominations-header { padding:64px 22px 24px !important; }
+        /* На мобилке карусель номинаций разворачивается в вертикальный
+           столбец — иначе видна только первая карточка, а остальные
+           уезжают за правый край и их не находят (частая жалоба). */
+        .nominations-scroll { flex-direction:column !important; overflow-x:visible !important;
+          padding-left:0 !important; padding-bottom:40px !important; }
+        .nominations-scroll .nom-card { min-width:0 !important; max-width:none !important;
+          width:100% !important; border-right:none !important;
+          border-bottom:1px solid #2a2a32 !important; padding:32px 22px !important; }
+        .nominations-drag-hint { display:none !important; }
       }
     `;
     document.head.appendChild(el);
@@ -1548,6 +1557,7 @@ function NominationsSection({
           <GlitchHeading text="Номинации" />
         </p>
         <p
+          className="nominations-drag-hint"
           style={{
             color: "#6a6a72",
             fontSize: 13,
@@ -1618,6 +1628,7 @@ function NominationsSection({
         {shownNoms.map((nom, i) => (
           <motion.div
             key={nom.id}
+            className="nom-card"
             initial={{ opacity: 0, y: 32 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
@@ -2041,15 +2052,20 @@ function GeographySection({
 }) {
   const [showAll, setShowAll] = useState(false);
   const counts = regionCounts ?? {};
+  // Канонические субъекты РФ (без служебного «Другой регион») — это стабильный
+  // знаменатель «X из N субъектов». Раньше знаменатель считался как длина
+  // списка + любые нестандартные строки из заявок, из-за чего один произвольно
+  // введённый регион («татарстан») раздувал счёт до 90.
+  const canon = REGIONS.filter((r) => r !== "Другой регион");
   const extras = Object.keys(counts).filter((r) => !REGIONS.includes(r));
-  const all = [...REGIONS.filter((r) => r !== "Другой регион"), ...extras];
+  const all = [...canon, ...extras];
   const active = all
     .filter((r) => (counts[r] ?? 0) > 0)
     .sort((a, b) => (counts[b] ?? 0) - (counts[a] ?? 0));
   const inactive = all.filter((r) => !((counts[r] ?? 0) > 0));
   const activeCount = active.length;
   const totalApps = Object.values(counts).reduce((s, n) => s + n, 0);
-  const totalRegions = all.length;
+  const totalRegions = canon.length;
   const font = "var(--font-onest), sans-serif";
   const plural = (n: number, one: string, few: string, many: string) => {
     const m10 = n % 10;

@@ -1,5 +1,6 @@
 import { DarkLanding } from "@/components/landing/dark-landing";
 import { db, safeDb } from "@/lib/db";
+import { canonicalRegion } from "@/lib/regions";
 
 /**
  * Публичный лендинг — тёмный премиум-РСО. Живые счётчики (заявки/регионы/
@@ -26,9 +27,14 @@ export default async function Home() {
       db.season.findFirst({ where: { isActive: true }, select: { startAt: true, endAt: true } }),
     ]);
 
+    // Схлопываем регионы к каноническим названиям, чтобы дубли из старых заявок
+    // со свободным вводом («татарстан» → «Республика Татарстан») не считались
+    // отдельными субъектами.
     const regionCounts: Record<string, number> = {};
     for (const g of regionGroups) {
-      if (g.region && g.region !== "—") regionCounts[g.region] = g._count._all;
+      if (!g.region || g.region === "—") continue;
+      const key = canonicalRegion(g.region);
+      regionCounts[key] = (regionCounts[key] ?? 0) + g._count._all;
     }
 
     return {

@@ -95,3 +95,38 @@ export const REGIONS = [
   "Херсонская область",
   "Другой регион",
 ];
+
+/** Количество субъектов РФ (канонический список без «Другой регион»). */
+export const SUBJECT_COUNT = REGIONS.filter((r) => r !== "Другой регион").length;
+
+const normalize = (s: string) =>
+  s.trim().toLowerCase().replace(/ё/g, "е").replace(/\s+/g, " ");
+
+/**
+ * Приводит произвольно введённый регион к каноническому названию из REGIONS.
+ * Нужно, потому что раньше в форме заявки регион был свободным полем — так в базу
+ * попал «татарстан», который на «Географии премии» считался отдельным субъектом
+ * (дубль «Республики Татарстан»). Логика:
+ *  1) точное совпадение без учёта регистра/«ё»/пробелов;
+ *  2) уверенное вхождение (введённое — часть канонического названия или наоборот),
+ *     но только если такой канонический регион ровно один.
+ * Если сопоставить не удалось — возвращаем очищенную строку как есть.
+ */
+export function canonicalRegion(input: string | null | undefined): string {
+  const raw = (input ?? "").trim();
+  if (!raw) return raw;
+  const n = normalize(raw);
+
+  const exact = REGIONS.find((r) => normalize(r) === n);
+  if (exact) return exact;
+
+  if (n.length >= 4) {
+    const matches = REGIONS.filter((r) => r !== "Другой регион").filter((r) => {
+      const rn = normalize(r);
+      return rn.includes(n) || n.includes(rn);
+    });
+    if (matches.length === 1) return matches[0];
+  }
+
+  return raw;
+}

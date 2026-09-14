@@ -18,6 +18,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { requestIp } from "@/lib/net";
 import { putObject } from "@/lib/storage";
 import { isAllowedMime, uploadConfig } from "@/lib/upload-config";
+import { canonicalRegion } from "@/lib/regions";
 import { brand } from "@/lib/brand";
 import { measure, recordError } from "@/lib/observability";
 import { auth } from "@/auth";
@@ -305,7 +306,7 @@ export async function submitNomineeApplication(
     const s = (k: string) => (typeof p[k] === "string" ? (p[k] as string) : "");
     orgName = s("orgName") || applicantFio || "—";
     inn = s("orgInn") || "—";
-    region = s("region") || "—";
+    region = canonicalRegion(s("region")) || "—";
     contactFio = applicantFio || s("fio") || "—";
     position = null;
     nomineeName = s("fio") || s("orgName") || applicantFio || "—";
@@ -336,7 +337,7 @@ export async function submitNomineeApplication(
     };
     orgName = g("workplace") || fio || "—";
     inn = g("inn") || "—";
-    region = g("region") || "—";
+    region = canonicalRegion(g("region")) || "—";
     contactFio = applicantFio || fio || "—";
     position = g("position") || null;
     nomineeName = fio;
