@@ -1814,15 +1814,21 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                         >
                           Выберите вариант
                         </option>
-                        {NOMINATIONS.map((n) => (
-                          <option
-                            key={n.id}
-                            value={n.id}
-                            style={{ background: "#121216" }}
-                          >
-                            {n.id} — {n.title}
-                          </option>
-                        ))}
+                        {/* В форме заявки номинации показываем строго по номеру
+                            (01→13). На лендинге порядок другой — там карточки
+                            сгруппированы по категориям, из-за чего в плоском
+                            списке номера шли не по порядку. */}
+                        {[...NOMINATIONS]
+                          .sort((a, b) => Number(a.id) - Number(b.id))
+                          .map((n) => (
+                            <option
+                              key={n.id}
+                              value={n.id}
+                              style={{ background: "#121216" }}
+                            >
+                              {n.id} — {n.title}
+                            </option>
+                          ))}
                       </select>
                       <span
                         style={{
