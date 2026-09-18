@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { NOMINATIONS } from "@/components/landing/dark-landing";
 import { Confetti } from "@/components/apply/confetti";
 import { REGIONS } from "@/lib/regions";
+import { uploadConfig } from "@/lib/upload-config";
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
 
@@ -742,6 +743,8 @@ export type NomField = {
 };
 
 const NOM_FILE_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png";
+/** Максимальный размер одного файла, МБ — единый источник из uploadConfig. */
+const MAX_FILE_MB = Math.round(uploadConfig.maxFileSizeBytes / (1024 * 1024));
 
 /** Динамический рендер официальных полей выбранной номинации. */
 function DynamicNominationFields({
@@ -823,6 +826,9 @@ function DynamicNominationFields({
                     {files[f.name]!.name}
                   </span>
                 )}
+                <p style={{ color: "#6a6a72", fontSize: 12, fontFamily: F, marginTop: 6 }}>
+                  PDF, DOC, XLS, PPT, JPG, PNG — до {MAX_FILE_MB} МБ
+                </p>
               </div>
             ) : (
               <TextInput
@@ -1027,6 +1033,15 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
   // Значения и файлы динамических полей номинации (шаг «Данные по номинации»).
   const [dyn, setDyn] = useState<Record<string, string>>({});
   const [dynFiles, setDynFiles] = useState<Record<string, File | null>>({});
+  /** Проверка размера файла на клиенте — не даёт приложить файл больше лимита
+   *  и показывает понятное сообщение вместо «Ошибки сети» при отправке. */
+  const checkFileSize = (f: File | null): boolean => {
+    if (f && f.size > uploadConfig.maxFileSizeBytes) {
+      setSubmitError(`Файл «${f.name}» больше ${MAX_FILE_MB} МБ. Уменьшите размер и загрузите снова.`);
+      return false;
+    }
+    return true;
+  };
   const [form, setForm] = useState<FormState>({
     ...INITIAL,
     nomination: nominationId || "",
@@ -2139,7 +2154,10 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                       values={dyn}
                       files={dynFiles}
                       onValue={(n, v) => setDyn((p) => ({ ...p, [n]: v }))}
-                      onFile={(n, f) => setDynFiles((p) => ({ ...p, [n]: f }))}
+                      onFile={(n, f) => {
+                        if (!checkFileSize(f)) return;
+                        setDynFiles((p) => ({ ...p, [n]: f }));
+                      }}
                       accent={accent}
                       invalidSet={new Set(triedNext ? missingP2() : [])}
                     />
@@ -2272,7 +2290,10 @@ export function ApplyFlow({ schemas = {} }: { schemas?: Record<string, NomField[
                     </p>
                     <PhotoUpload
                       file={form.nomPhoto}
-                      onFile={(f) => set("nomPhoto", f)}
+                      onFile={(f) => {
+                        if (!checkFileSize(f)) return;
+                        set("nomPhoto", f);
+                      }}
                       accent={accent}
                     />
                   </div>
