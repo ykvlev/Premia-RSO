@@ -43,6 +43,13 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Заявки отправляются через Server Action и могут содержать вложения до 10 МБ
+    // на файл (см. lib/upload-config.ts). По умолчанию Next ограничивает тело
+    // Server Action 1 МБ — из-за этого отправка заявки с PDF падала «Ошибкой сети».
+    // Держим запас над максимальным файлом (несколько вложений + поля формы).
+    serverActions: { bodySizeLimit: "25mb" },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
